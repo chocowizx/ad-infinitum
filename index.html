@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ad Infinitum - Master Your Vocabulary</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Auth Screen -->
+        <div id="auth-screen" class="screen active">
+            <div class="auth-hero">
+                <img src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1920&q=80" alt="Study" class="hero-bg">
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h1>Ad Infinitum</h1>
+                    <p>Expand your vocabulary. Elevate your potential.</p>
+                </div>
+            </div>
+            <div class="auth-panel">
+                <div class="auth-container">
+                    <div class="auth-header">
+                        <img src="https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=100&h=100&fit=crop&q=80" alt="Logo" class="auth-logo">
+                        <h2>Welcome</h2>
+                        <p class="auth-subtitle">Sign in to continue your learning journey</p>
+                    </div>
+
+                    <div id="login-form" class="auth-form">
+                        <div class="input-group">
+                            <i class="fas fa-envelope"></i>
+                            <input type="email" id="login-email" placeholder="Email address" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" id="login-password" placeholder="Password" required>
+                        </div>
+                        <button id="login-btn" class="btn primary">Sign In</button>
+                        <p class="switch-auth">New here? <a href="#" id="show-signup">Create an account</a></p>
+                    </div>
+
+                    <div id="signup-form" class="auth-form hidden">
+                        <div class="input-group">
+                            <i class="fas fa-envelope"></i>
+                            <input type="email" id="signup-email" placeholder="Email address" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" id="signup-password" placeholder="Password (min 6 characters)" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-graduation-cap"></i>
+                            <input type="number" id="signup-sat" placeholder="SAT Score (optional)" min="400" max="1600">
+                        </div>
+                        <button id="signup-btn" class="btn primary">Create Account</button>
+                        <p class="switch-auth">Already a member? <a href="#" id="show-login">Sign in</a></p>
+                    </div>
+
+                    <div id="auth-error" class="error-message hidden"></div>
+
+                    <div class="auth-features">
+                        <div class="feature">
+                            <i class="fas fa-brain"></i>
+                            <span>Smart Learning</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Track Progress</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-trophy"></i>
+                            <span>Compete & Win</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard-screen" class="screen hidden">
+            <nav class="navbar">
+                <div class="nav-brand">
+                    <h1 class="logo">Ad Infinitum</h1>
+                </div>
+                <div class="nav-links">
+                    <a href="#" class="nav-link active" data-screen="learn">
+                        <i class="fas fa-book-open"></i> Learn
+                    </a>
+                    <a href="#" class="nav-link" data-screen="review">
+                        <i class="fas fa-redo"></i> Review
+                    </a>
+                    <a href="#" class="nav-link" data-screen="progress">
+                        <i class="fas fa-chart-bar"></i> Progress
+                    </a>
+                    <a href="#" class="nav-link" data-screen="leaderboard">
+                        <i class="fas fa-trophy"></i> Leaderboard
+                    </a>
+                </div>
+                <div class="user-menu">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span id="display-name"></span>
+                    <button id="switch-to-admin-btn" class="btn icon-btn hidden" onclick="toggleAdminStudentView()" title="Switch to Admin">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button id="logout-btn" class="btn icon-btn" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </nav>
+
+            <!-- Learn Section -->
+            <div id="learn-section" class="section active">
+                <div class="section-bg">
+                    <img src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1920&q=80" alt="">
+                </div>
+                <div class="section-content">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Learn New Words</h2>
+                            <p>Build your vocabulary one word at a time</p>
+                        </div>
+                        <div class="level-selector">
+                            <select id="level-select">
+                                <option value="1">Level 1 - Foundation</option>
+                                <option value="2">Level 2 - Building</option>
+                                <option value="3">Level 3 - Advancing</option>
+                                <option value="4">Level 4 - Mastering</option>
+                                <option value="5">Level 5 - Expert</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="word-card" class="card flashcard">
+                        <div class="card-inner">
+                            <div class="card-front">
+                                <span class="word-level"><i class="fas fa-layer-group"></i> Level 1</span>
+                                <h3 class="word"></h3>
+                                <p class="part-of-speech"></p>
+                                <button class="btn primary show-answer">
+                                    <i class="fas fa-eye"></i> Reveal Answer
+                                </button>
+                            </div>
+                            <div class="card-back hidden">
+                                <div class="answer-content">
+                                    <h3 class="word"></h3>
+                                    <span class="part-of-speech"></span>
+                                    <div class="definition-box">
+                                        <p class="definition"></p>
+                                    </div>
+                                    <div class="tldr-box">
+                                        <span class="tldr-label">TL;DR</span>
+                                        <p class="definition-simple"><span></span></p>
+                                    </div>
+                                    <p class="korean"></p>
+                                    <div class="example-box">
+                                        <i class="fas fa-quote-left"></i>
+                                        <p class="example"><em></em></p>
+                                    </div>
+                                </div>
+                                <div class="rating-buttons">
+                                    <button class="btn rating wrong" data-rating="1">
+                                        <i class="fas fa-times"></i> Didn't Know
+                                    </button>
+                                    <button class="btn rating okay" data-rating="3">
+                                        <i class="fas fa-check"></i> Got It
+                                    </button>
+                                    <button class="btn rating easy" data-rating="5">
+                                        <i class="fas fa-bolt"></i> Easy!
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="session-stats">
+                        <div class="stat">
+                            <i class="fas fa-book"></i>
+                            <span>Words today: <strong id="session-count">0</strong></span>
+                        </div>
+                        <div class="stat">
+                            <i class="fas fa-fire"></i>
+                            <span>Streak: <strong id="streak-count">0</strong> days</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Review Section -->
+            <div id="review-section" class="section">
+                <div class="section-bg">
+                    <img src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1920&q=80" alt="">
+                </div>
+                <div class="section-content">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Review Time</h2>
+                            <p id="due-count">0 words due for review</p>
+                        </div>
+                    </div>
+                    <div id="review-card" class="card flashcard">
+                        <p class="no-reviews">
+                            <i class="fas fa-check-circle"></i><br>
+                            All caught up! No words due for review.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progress-section" class="section">
+                <div class="section-bg">
+                    <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1920&q=80" alt="">
+                </div>
+                <div class="section-content">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Your Progress</h2>
+                            <p>Track your vocabulary mastery journey</p>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-book-reader"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="words-learned">0</p>
+                                <h4>Words Learned</h4>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon gold"><i class="fas fa-crown"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="words-mastered">0</p>
+                                <h4>Words Mastered</h4>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green"><i class="fas fa-bullseye"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="accuracy">0%</p>
+                                <h4>Accuracy</h4>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange"><i class="fas fa-fire-alt"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="current-streak">0</p>
+                                <h4>Day Streak</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="level-progress">
+                        <h3><i class="fas fa-layer-group"></i> Progress by Level</h3>
+                        <div id="level-bars"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard Section -->
+            <div id="leaderboard-section" class="section">
+                <div class="section-bg">
+                    <img src="https://images.unsplash.com/photo-1552581234-26160f608093?w=1920&q=80" alt="">
+                </div>
+                <div class="section-content">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Leaderboard</h2>
+                            <p>See how you rank among your peers</p>
+                        </div>
+                    </div>
+                    <div class="leaderboard-table">
+                        <div class="leaderboard-header">
+                            <span>Rank</span>
+                            <span>Student</span>
+                            <span>Mastered</span>
+                            <span>Accuracy</span>
+                        </div>
+                        <div id="leaderboard-rows"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="admin-screen" class="screen hidden">
+            <nav class="navbar admin-nav">
+                <div class="nav-brand">
+                    <h1 class="logo">Ad Infinitum</h1>
+                    <span class="admin-badge">ADMIN</span>
+                </div>
+                <div class="nav-links">
+                    <a href="#" class="nav-link active" data-screen="admin-words">
+                        <i class="fas fa-spell-check"></i> Vocabulary
+                    </a>
+                    <a href="#" class="nav-link" data-screen="admin-students">
+                        <i class="fas fa-users"></i> Students
+                    </a>
+                    <a href="#" class="nav-link" data-screen="admin-stats">
+                        <i class="fas fa-analytics"></i> Analytics
+                    </a>
+                </div>
+                <div class="user-menu">
+                    <button id="switch-to-student-btn" class="btn secondary" onclick="toggleAdminStudentView()">
+                        <i class="fas fa-user-graduate"></i> Student View
+                    </button>
+                    <button id="admin-logout-btn" class="btn icon-btn" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </nav>
+
+            <div class="admin-container">
+                <div id="admin-words-section" class="section active">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Manage Vocabulary</h2>
+                            <p>Add, edit, and organize your word database</p>
+                        </div>
+                        <button id="add-word-btn" class="btn primary">
+                            <i class="fas fa-plus"></i> Add Word
+                        </button>
+                    </div>
+                    <div class="search-bar">
+                        <div class="search-input">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="word-search" placeholder="Search words...">
+                        </div>
+                        <select id="filter-level">
+                            <option value="">All Levels</option>
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                        </select>
+                    </div>
+                    <div id="words-table" class="data-table"></div>
+                </div>
+
+                <div id="admin-students-section" class="section">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Student Progress</h2>
+                            <p>Monitor individual student performance</p>
+                        </div>
+                    </div>
+                    <div id="students-table" class="data-table"></div>
+                </div>
+
+                <div id="admin-stats-section" class="section">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Analytics Overview</h2>
+                            <p>Key metrics and insights</p>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="total-students">0</p>
+                                <h4>Total Students</h4>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-book"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="total-words">0</p>
+                                <h4>Total Words</h4>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="avg-words">0</p>
+                                <h4>Avg Words/Student</h4>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green"><i class="fas fa-user-clock"></i></div>
+                            <div class="stat-info">
+                                <p class="stat-number" id="active-today">0</p>
+                                <h4>Active Today</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Word Edit Modal -->
+        <div id="word-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title">Edit Word</h3>
+                    <button class="modal-close" id="cancel-edit"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="word-form">
+                    <input type="hidden" id="word-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Word/Phrase</label>
+                            <input type="text" id="edit-word" required>
+                        </div>
+                        <div class="form-group small">
+                            <label>Level</label>
+                            <select id="edit-level">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Part of Speech</label>
+                        <input type="text" id="edit-pos" placeholder="noun, verb, adjective...">
+                    </div>
+                    <div class="form-group">
+                        <label>Definition</label>
+                        <textarea id="edit-definition" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>TL;DR (Simple definition)</label>
+                        <input type="text" id="edit-tldr">
+                    </div>
+                    <div class="form-group">
+                        <label>Korean Translation</label>
+                        <input type="text" id="edit-korean">
+                    </div>
+                    <div class="form-group">
+                        <label>Example Sentence</label>
+                        <textarea id="edit-example" rows="2"></textarea>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="button" class="btn secondary" id="cancel-edit-btn">Cancel</button>
+                        <button type="submit" class="btn primary">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
