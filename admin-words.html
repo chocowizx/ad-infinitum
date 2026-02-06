@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Management - Ad Infinitum Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #6366f1; margin-bottom: 20px; }
+        .back-link { color: #6366f1; text-decoration: none; margin-bottom: 20px; display: inline-block; }
+        .back-link:hover { text-decoration: underline; }
+
+        .controls {
+            display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+            background: #2a2a4e; padding: 15px; border-radius: 8px;
+        }
+        .controls select, .controls input {
+            padding: 10px; border-radius: 6px; border: 1px solid #444;
+            background: #1a1a2e; color: #eee; font-size: 14px;
+        }
+        .controls input[type="text"] { width: 250px; }
+        .controls button {
+            padding: 10px 20px; border-radius: 6px; border: none;
+            background: #6366f1; color: white; cursor: pointer; font-size: 14px;
+        }
+        .controls button:hover { background: #4f46e5; }
+        .controls button.danger { background: #ef4444; }
+        .controls button.danger:hover { background: #dc2626; }
+        .controls button.success { background: #10b981; }
+        .controls button.success:hover { background: #059669; }
+
+        .stats {
+            display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .stat-box {
+            background: #2a2a4e; padding: 15px 25px; border-radius: 8px;
+        }
+        .stat-box .label { color: #888; font-size: 12px; text-transform: uppercase; }
+        .stat-box .value { font-size: 24px; font-weight: bold; color: #6366f1; }
+
+        .word-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .word-card {
+            background: #2a2a4e;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .word-card:hover { border-color: #6366f1; }
+        .word-card.selected { border-color: #10b981; background: #1e3a2f; }
+        .word-card .word-title {
+            font-size: 18px; font-weight: bold; margin-bottom: 5px;
+        }
+        .word-card .word-pos { color: #888; font-size: 12px; margin-bottom: 8px; }
+        .word-card .word-level {
+            display: inline-block; padding: 3px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: bold;
+        }
+        .word-card .word-level.level-1 { background: #10b981; color: white; }
+        .word-card .word-level.level-2 { background: #f59e0b; color: white; }
+        .word-card .word-level.level-3 { background: #ef4444; color: white; }
+        .word-card .word-passage {
+            margin-top: 10px; font-size: 12px; color: #aaa;
+            max-height: 60px; overflow: hidden;
+        }
+
+        .bulk-actions {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #2a2a4e; padding: 15px 25px; border-radius: 8px;
+            display: none; gap: 15px; align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .bulk-actions.visible { display: flex; }
+
+        /* Edit Modal */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal.visible { display: flex; }
+        .modal-content {
+            background: #2a2a4e; padding: 25px; border-radius: 12px;
+            width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal h2 { margin-bottom: 20px; color: #6366f1; }
+        .modal label { display: block; margin-bottom: 5px; color: #aaa; font-size: 12px; text-transform: uppercase; }
+        .modal input, .modal textarea, .modal select {
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444;
+            background: #1a1a2e; color: #eee; font-size: 14px; margin-bottom: 15px;
+        }
+        .modal textarea { min-height: 100px; resize: vertical; font-family: inherit; }
+        .modal .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+        .pagination {
+            display: flex; gap: 10px; justify-content: center; margin-top: 20px;
+        }
+        .pagination button {
+            padding: 8px 16px; border-radius: 6px; border: none;
+            background: #444; color: #eee; cursor: pointer;
+        }
+        .pagination button:hover { background: #555; }
+        .pagination button.active { background: #6366f1; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #loading {
+            text-align: center; padding: 40px; color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to App</a>
+        <h1><i class="fas fa-edit"></i> Word Management</h1>
+
+        <div class="controls">
+            <select id="level-filter">
+                <option value="all">All Levels</option>
+                <option value="1">Level 1 (Easy)</option>
+                <option value="2">Level 2 (Medium)</option>
+                <option value="3">Level 3 (Hard)</option>
+            </select>
+            <input type="text" id="search-input" placeholder="Search words...">
+            <button onclick="searchWords()"><i class="fas fa-search"></i> Search</button>
+            <button onclick="selectAll()" class="success"><i class="fas fa-check-double"></i> Select All</button>
+            <button onclick="deselectAll()"><i class="fas fa-times"></i> Deselect All</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="label">Total Words</div>
+                <div class="value" id="total-count">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Level 1</div>
+                <div class="value" id="level1-count">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Level 2</div>
+                <div class="value" id="level2-count">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Level 3</div>
+                <div class="value" id="level3-count">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Selected</div>
+                <div class="value" id="selected-count">0</div>
+            </div>
+        </div>
+
+        <div id="loading"><i class="fas fa-spinner fa-spin"></i> Loading words...</div>
+        <div class="word-grid" id="word-grid"></div>
+
+        <div class="pagination" id="pagination"></div>
+
+        <div class="bulk-actions" id="bulk-actions">
+            <span><strong id="bulk-count">0</strong> selected</span>
+            <select id="bulk-level">
+                <option value="1">Set Level 1</option>
+                <option value="2">Set Level 2</option>
+                <option value="3">Set Level 3</option>
+            </select>
+            <button onclick="applyBulkLevel()" class="success"><i class="fas fa-layer-group"></i> Apply Level</button>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="edit-modal">
+        <div class="modal-content">
+            <h2><i class="fas fa-edit"></i> Edit Word</h2>
+            <input type="hidden" id="edit-id">
+
+            <label>Word</label>
+            <input type="text" id="edit-word">
+
+            <label>Part of Speech</label>
+            <input type="text" id="edit-pos" placeholder="noun, verb, adjective...">
+
+            <label>Level</label>
+            <select id="edit-level">
+                <option value="1">Level 1 (Easy)</option>
+                <option value="2">Level 2 (Medium)</option>
+                <option value="3">Level 3 (Hard)</option>
+            </select>
+
+            <label>Definition</label>
+            <textarea id="edit-definition"></textarea>
+
+            <label>TL;DR (Short Definition)</label>
+            <input type="text" id="edit-tldr">
+
+            <label>Korean Translation</label>
+            <input type="text" id="edit-korean">
+
+            <label>Example Sentence</label>
+            <textarea id="edit-example"></textarea>
+
+            <label>Passage (Practice Question)</label>
+            <textarea id="edit-passage" style="min-height: 150px;"></textarea>
+
+            <div class="btn-row">
+                <button onclick="closeModal()">Cancel</button>
+                <button onclick="saveWord()" class="success"><i class="fas fa-save"></i> Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCilWbme84ANKVKc2clsO5Zl1zzd9f0OEw",
+            authDomain: "ad-infinitum-2eac8.firebaseapp.com",
+            projectId: "ad-infinitum-2eac8",
+            storageBucket: "ad-infinitum-2eac8.firebasestorage.app",
+            messagingSenderId: "1033641733165",
+            appId: "1:1033641733165:web:f6b7518efaeebfa8085ca4"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        let allWords = [];
+        let filteredWords = [];
+        let selectedIds = new Set();
+        let currentPage = 1;
+        const perPage = 50;
+
+        // Check admin auth
+        auth.onAuthStateChanged(async user => {
+            if (!user) {
+                window.location.href = 'index.html';
+                return;
+            }
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (!userDoc.exists || !userDoc.data().isAdmin) {
+                alert('Admin access required');
+                window.location.href = 'index.html';
+                return;
+            }
+            loadAllWords();
+        });
+
+        async function loadAllWords() {
+            const snapshot = await db.collection('words').get();
+            allWords = [];
+            snapshot.forEach(doc => {
+                allWords.push({ id: doc.id, ...doc.data() });
+            });
+            allWords.sort((a, b) => (a.word || '').localeCompare(b.word || ''));
+            filteredWords = [...allWords];
+            updateStats();
+            renderWords();
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function updateStats() {
+            document.getElementById('total-count').textContent = allWords.length;
+            document.getElementById('level1-count').textContent = allWords.filter(w => w.level === 1).length;
+            document.getElementById('level2-count').textContent = allWords.filter(w => w.level === 2).length;
+            document.getElementById('level3-count').textContent = allWords.filter(w => w.level === 3).length;
+            document.getElementById('selected-count').textContent = selectedIds.size;
+            document.getElementById('bulk-count').textContent = selectedIds.size;
+
+            const bulkActions = document.getElementById('bulk-actions');
+            if (selectedIds.size > 0) {
+                bulkActions.classList.add('visible');
+            } else {
+                bulkActions.classList.remove('visible');
+            }
+        }
+
+        function searchWords() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            const levelFilter = document.getElementById('level-filter').value;
+
+            filteredWords = allWords.filter(w => {
+                const matchesQuery = !query || (w.word || '').toLowerCase().includes(query);
+                const matchesLevel = levelFilter === 'all' || w.level === parseInt(levelFilter);
+                return matchesQuery && matchesLevel;
+            });
+
+            currentPage = 1;
+            renderWords();
+        }
+
+        document.getElementById('level-filter').addEventListener('change', searchWords);
+        document.getElementById('search-input').addEventListener('keyup', e => {
+            if (e.key === 'Enter') searchWords();
+        });
+
+        function renderWords() {
+            const grid = document.getElementById('word-grid');
+            const start = (currentPage - 1) * perPage;
+            const pageWords = filteredWords.slice(start, start + perPage);
+
+            grid.innerHTML = pageWords.map(w => `
+                <div class="word-card ${selectedIds.has(w.id) ? 'selected' : ''}"
+                     data-id="${w.id}"
+                     onclick="toggleSelect('${w.id}')"
+                     ondblclick="editWord('${w.id}')">
+                    <div class="word-title">${w.word || '(no word)'}</div>
+                    <div class="word-pos">${w.partOfSpeech || ''}</div>
+                    <span class="word-level level-${w.level || 1}">Level ${w.level || 1}</span>
+                    <div class="word-passage">${w.passage ? w.passage.substring(0, 100) + '...' : '<em>No passage</em>'}</div>
+                </div>
+            `).join('');
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredWords.length / perPage);
+            const pagination = document.getElementById('pagination');
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            html += `<button onclick="goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-angle-double-left"></i></button>`;
+            html += `<button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-angle-left"></i></button>`;
+
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                html += `<button onclick="goToPage(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+            }
+
+            html += `<button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-angle-right"></i></button>`;
+            html += `<button onclick="goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-angle-double-right"></i></button>`;
+
+            pagination.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderWords();
+            window.scrollTo(0, 0);
+        }
+
+        function toggleSelect(id) {
+            if (selectedIds.has(id)) {
+                selectedIds.delete(id);
+            } else {
+                selectedIds.add(id);
+            }
+            updateStats();
+            renderWords();
+        }
+
+        function selectAll() {
+            filteredWords.forEach(w => selectedIds.add(w.id));
+            updateStats();
+            renderWords();
+        }
+
+        function deselectAll() {
+            selectedIds.clear();
+            updateStats();
+            renderWords();
+        }
+
+        function editWord(id) {
+            const word = allWords.find(w => w.id === id);
+            if (!word) return;
+
+            document.getElementById('edit-id').value = word.id;
+            document.getElementById('edit-word').value = word.word || '';
+            document.getElementById('edit-pos').value = word.partOfSpeech || '';
+            document.getElementById('edit-level').value = word.level || 1;
+            document.getElementById('edit-definition').value = word.definition || '';
+            document.getElementById('edit-tldr').value = word.tldr || '';
+            document.getElementById('edit-korean').value = word.korean || '';
+            document.getElementById('edit-example').value = word.example || '';
+            document.getElementById('edit-passage').value = word.passage || '';
+
+            document.getElementById('edit-modal').classList.add('visible');
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').classList.remove('visible');
+        }
+
+        async function saveWord() {
+            const id = document.getElementById('edit-id').value;
+            const data = {
+                word: document.getElementById('edit-word').value,
+                partOfSpeech: document.getElementById('edit-pos').value,
+                level: parseInt(document.getElementById('edit-level').value),
+                definition: document.getElementById('edit-definition').value,
+                tldr: document.getElementById('edit-tldr').value,
+                korean: document.getElementById('edit-korean').value,
+                example: document.getElementById('edit-example').value,
+                passage: document.getElementById('edit-passage').value
+            };
+
+            try {
+                await db.collection('words').doc(id).update(data);
+
+                // Update local cache
+                const idx = allWords.findIndex(w => w.id === id);
+                if (idx !== -1) {
+                    allWords[idx] = { ...allWords[idx], ...data };
+                }
+
+                closeModal();
+                updateStats();
+                renderWords();
+                alert('Word saved!');
+            } catch (e) {
+                alert('Error saving: ' + e.message);
+            }
+        }
+
+        async function applyBulkLevel() {
+            if (selectedIds.size === 0) return;
+
+            const level = parseInt(document.getElementById('bulk-level').value);
+            const confirm = window.confirm(`Set ${selectedIds.size} word(s) to Level ${level}?`);
+            if (!confirm) return;
+
+            const batch = db.batch();
+            selectedIds.forEach(id => {
+                batch.update(db.collection('words').doc(id), { level });
+            });
+
+            try {
+                await batch.commit();
+
+                // Update local cache
+                selectedIds.forEach(id => {
+                    const idx = allWords.findIndex(w => w.id === id);
+                    if (idx !== -1) allWords[idx].level = level;
+                });
+
+                selectedIds.clear();
+                updateStats();
+                renderWords();
+                alert('Levels updated!');
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+        });
+    </script>
+</body>
+</html>

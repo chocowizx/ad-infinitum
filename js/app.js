@@ -138,6 +138,8 @@ let quizAllWords = []; // All available words for current filter
 let allWordsCache = []; // Cache of all words for distractors
 let moduleQueue = []; // Current module's question queue
 let wrongAnswers = []; // Words answered incorrectly (to repeat)
+let usedWordIds = new Set(); // Track words used across all modules in session
+let practiceWrongAnswers = []; // Track all wrong answers this session for Review
 let currentModule = 1;
 let moduleProgress = 0;
 let moduleCorrect = 0;
@@ -242,23 +244,29 @@ function initializeModule() {
     moduleProgress = 0;
     moduleCorrect = 0;
 
-    // First add any wrong answers from previous attempts
+    // First add any wrong answers from previous attempts (these can repeat)
     moduleQueue = [...wrongAnswers];
     wrongAnswers = [];
 
-    // Then fill remaining spots with new words
+    // Then fill remaining spots with NEW words (not used in previous modules)
     const shuffled = [...quizAllWords].sort(() => Math.random() - 0.5);
-    const usedIds = new Set(moduleQueue.map(w => w.id));
+    const currentQueueIds = new Set(moduleQueue.map(w => w.id));
 
     for (const word of shuffled) {
-        if (!usedIds.has(word.id) && moduleQueue.length < QUESTIONS_PER_MODULE) {
+        // Skip if already in queue or already used in previous modules
+        if (!currentQueueIds.has(word.id) && !usedWordIds.has(word.id) && moduleQueue.length < QUESTIONS_PER_MODULE) {
             moduleQueue.push(word);
-            usedIds.add(word.id);
+            currentQueueIds.add(word.id);
         }
     }
 
+    // Mark all new words as used for future modules
+    moduleQueue.forEach(w => usedWordIds.add(w.id));
+
     // Shuffle the final queue
     moduleQueue.sort(() => Math.random() - 0.5);
+
+    console.log(`Module ${currentModule} initialized with ${moduleQueue.length} questions`);
 }
 
 async function loadDistractors() {
@@ -444,6 +452,12 @@ async function handleQuizAnswer(selectedBtn) {
         if (!wrongAnswers.find(w => w.id === currentWord.id)) {
             wrongAnswers.push(currentWord);
         }
+        // Track for Review section
+        if (!practiceWrongAnswers.find(w => w.id === currentWord.id)) {
+            practiceWrongAnswers.push(currentWord);
+        }
+        // Save to Firebase for persistent wrong answers list
+        saveWrongAnswer(currentWord.id);
     }
 
     sessionCount++;
@@ -470,6 +484,7 @@ document.getElementById('level-select')?.addEventListener('change', () => {
     currentModule = 1;
     moduleQueue = [];
     wrongAnswers = [];
+    usedWordIds = new Set(); // Reset used words for new level
     moduleProgress = 0;
     moduleCorrect = 0;
     loadQuizQuestion();
@@ -703,6 +718,36 @@ async function recordProgress(wordId, rating) {
     await db.collection('users').doc(currentUser.uid).update(updates);
 }
 
+// Save wrong answer to Firebase for Review section
+async function saveWrongAnswer(wordId) {
+    try {
+        await db.collection('users').doc(currentUser.uid).update({
+            wrongAnswers: firebase.firestore.FieldValue.arrayUnion({
+                wordId: wordId,
+                timestamp: new Date().toISOString()
+            })
+        });
+    } catch (e) {
+        // Field might not exist, create it
+        await db.collection('users').doc(currentUser.uid).set({
+            wrongAnswers: [{
+                wordId: wordId,
+                timestamp: new Date().toISOString()
+            }]
+        }, { merge: true });
+    }
+}
+
+// Clear a wrong answer from Firebase (when user reviews it)
+async function clearWrongAnswer(wordId) {
+    const userDoc = await db.collection('users').doc(currentUser.uid).get();
+    const wrongAnswers = userDoc.data()?.wrongAnswers || [];
+    const filtered = wrongAnswers.filter(w => w.wordId !== wordId);
+    await db.collection('users').doc(currentUser.uid).update({
+        wrongAnswers: filtered
+    });
+}
+
 // Update session stats display
 function updateSessionStats() {
     document.getElementById('session-count').textContent = sessionCount;
@@ -718,24 +763,50 @@ let currentReviewIndex = 0;
 async function loadReviewWords() {
     const now = new Date();
     reviewQueue = [];
+    const addedIds = new Set();
 
-    for (const [wordId, progress] of Object.entries(userProgress)) {
-        if (progress.nextReview && progress.nextReview.toDate() <= now) {
-            const wordDoc = await db.collection('words').doc(wordId).get();
+    // First, load wrong answers from practice (priority)
+    const userDoc = await db.collection('users').doc(currentUser.uid).get();
+    const savedWrongAnswers = userDoc.data()?.wrongAnswers || [];
+
+    for (const wrong of savedWrongAnswers) {
+        if (!addedIds.has(wrong.wordId)) {
+            const wordDoc = await db.collection('words').doc(wrong.wordId).get();
             if (wordDoc.exists) {
-                reviewQueue.push({ id: wordId, ...wordDoc.data(), progress });
+                reviewQueue.push({
+                    id: wrong.wordId,
+                    ...wordDoc.data(),
+                    isWrongAnswer: true,
+                    wrongTimestamp: wrong.timestamp
+                });
+                addedIds.add(wrong.wordId);
             }
         }
     }
 
-    document.getElementById('due-count').textContent = `${reviewQueue.length} words due for review`;
+    // Then add spaced repetition due words
+    for (const [wordId, progress] of Object.entries(userProgress)) {
+        if (!addedIds.has(wordId) && progress.nextReview && progress.nextReview.toDate() <= now) {
+            const wordDoc = await db.collection('words').doc(wordId).get();
+            if (wordDoc.exists) {
+                reviewQueue.push({ id: wordId, ...wordDoc.data(), progress });
+                addedIds.add(wordId);
+            }
+        }
+    }
+
+    const wrongCount = savedWrongAnswers.length;
+    const dueCount = reviewQueue.length - wrongCount;
+    document.getElementById('due-count').textContent = wrongCount > 0
+        ? `${wrongCount} wrong answer${wrongCount > 1 ? 's' : ''} + ${dueCount} due for review`
+        : `${reviewQueue.length} words due for review`;
 
     const reviewCard = document.getElementById('review-card');
     if (reviewQueue.length === 0) {
         reviewCard.innerHTML = `
             <div class="no-reviews">
                 <i class="fas fa-check-circle"></i>
-                <p>All caught up! No words due for review.</p>
+                <p>All caught up! No words to review.</p>
                 <p style="font-size: 0.875rem; margin-top: 8px;">Keep practicing to build your review queue.</p>
             </div>
         `;
@@ -762,10 +833,14 @@ function displayReviewWord() {
     currentWord = word;
 
     const reviewCard = document.getElementById('review-card');
+    const labelIcon = word.isWrongAnswer ? 'fa-exclamation-circle' : 'fa-redo';
+    const labelText = word.isWrongAnswer ? 'Wrong Answer' : 'Review';
+    const labelColor = word.isWrongAnswer ? 'color: #ef4444;' : '';
+
     reviewCard.innerHTML = `
         <div class="card-inner">
             <div class="review-card-front">
-                <span class="word-level"><i class="fas fa-redo"></i> Review (${currentReviewIndex + 1}/${reviewQueue.length})</span>
+                <span class="word-level" style="${labelColor}"><i class="fas ${labelIcon}"></i> ${labelText} (${currentReviewIndex + 1}/${reviewQueue.length})</span>
                 <h3 class="word">${word.word}</h3>
                 <p class="part-of-speech">${word.partOfSpeech || ''}</p>
                 <button class="btn primary show-review-answer">
@@ -815,6 +890,12 @@ function displayReviewWord() {
         btn.addEventListener('click', async () => {
             const rating = parseInt(btn.dataset.rating);
             await recordProgress(currentWord.id, rating);
+
+            // Clear from wrong answers list if it was a wrong answer
+            if (currentWord.isWrongAnswer) {
+                await clearWrongAnswer(currentWord.id);
+            }
+
             sessionCount++;
             updateSessionStats();
             currentReviewIndex++;
