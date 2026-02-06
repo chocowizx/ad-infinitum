@@ -66,29 +66,74 @@ async function loadDifficultWords() {
 
 // ==================== QUIZ (LEARN) SECTION ====================
 
+let quizStudiedWords = []; // Track words studied this session
+let quizAllWords = []; // All available words for current filter
+
 async function loadQuizQuestion() {
-    const level = parseInt(document.getElementById('level-select').value);
+    const filter = document.getElementById('level-select').value;
 
-    // Get words at this level
-    const wordsSnapshot = await db.collection('words')
-        .where('level', '==', level)
-        .get();
-
-    const availableWords = [];
-    wordsSnapshot.forEach(doc => {
-        const data = doc.data();
-        // Only include words that have example sentences
-        if (data.example && data.example.trim()) {
-            availableWords.push({ id: doc.id, ...data });
+    // Load words based on filter
+    if (filter === 'difficult') {
+        // Load difficult words
+        if (difficultWords.length === 0) {
+            document.getElementById('quiz-card').innerHTML = `
+                <div class="no-reviews">
+                    <i class="fas fa-bookmark"></i>
+                    <p>No difficult words marked yet.</p>
+                    <p style="font-size: 0.875rem; margin-top: 8px;">Mark words as difficult in Flashcards to practice them here.</p>
+                </div>
+            `;
+            return;
         }
-    });
+        quizAllWords = [];
+        for (const wordId of difficultWords) {
+            const doc = await db.collection('words').doc(wordId).get();
+            if (doc.exists) {
+                quizAllWords.push({ id: doc.id, ...doc.data() });
+            }
+        }
+    } else {
+        const level = parseInt(filter);
+        const wordsSnapshot = await db.collection('words')
+            .where('level', '==', level)
+            .get();
 
-    if (availableWords.length < 4) {
+        quizAllWords = [];
+        wordsSnapshot.forEach(doc => {
+            const data = doc.data();
+            // Include all words, even without examples
+            quizAllWords.push({ id: doc.id, ...data });
+        });
+    }
+
+    // Filter out already studied words this session
+    let availableWords = quizAllWords.filter(w => !quizStudiedWords.includes(w.id));
+
+    // If all words studied, offer to restart
+    if (availableWords.length === 0 && quizAllWords.length > 0) {
+        document.getElementById('quiz-card').innerHTML = `
+            <div class="no-reviews">
+                <i class="fas fa-trophy"></i>
+                <p>You've studied all ${quizAllWords.length} words in this set!</p>
+                <p style="font-size: 0.875rem; margin-top: 8px;">Great work on completing the full list.</p>
+                <button class="btn primary" id="restart-quiz-btn" style="margin-top: 16px;">
+                    <i class="fas fa-redo"></i> Start Over
+                </button>
+            </div>
+        `;
+        document.getElementById('restart-quiz-btn').addEventListener('click', () => {
+            quizStudiedWords = [];
+            loadQuizQuestion();
+        });
+        return;
+    }
+
+    if (quizAllWords.length < 4) {
         document.getElementById('quiz-card').innerHTML = `
             <div class="no-reviews">
                 <i class="fas fa-info-circle"></i>
-                <p>Not enough words with example sentences at this level.</p>
-                <p style="font-size: 0.875rem; margin-top: 8px;">Try a different level.</p>
+                <p>Not enough words available (need at least 4).</p>
+                <p style="font-size: 0.875rem; margin-top: 8px;">Try a different level or mark more difficult words.</p>
             </div>
         `;
         return;
@@ -96,6 +141,7 @@ async function loadQuizQuestion() {
 
     // Pick a random word as the correct answer
     currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+    quizStudiedWords.push(currentWord.id);
 
     // Get distractors (same or higher level, non-synonyms)
     const distractorSnapshot = await db.collection('words')
@@ -121,15 +167,26 @@ async function loadQuizQuestion() {
 }
 
 function displayQuizQuestion() {
-    const level = document.getElementById('level-select').value;
+    const filter = document.getElementById('level-select').value;
+    const remaining = quizAllWords.length - quizStudiedWords.length;
 
-    // Create sentence with blank
-    let sentence = currentWord.example || `The word "${currentWord.word}" means ${currentWord.definition}`;
+    // Create sentence with blank - generate fallback if no example
+    let sentence;
+    if (currentWord.example && currentWord.example.trim()) {
+        sentence = currentWord.example;
+    } else if (currentWord.definition) {
+        // Generate a fill-in-the-blank from the definition
+        sentence = `Someone who is ${currentWord.word.toLowerCase()} can be described as: ${currentWord.definition}`;
+    } else {
+        sentence = `The word "${currentWord.word}" fits in this blank: _______`;
+    }
+
     const wordRegex = new RegExp(`\\b${currentWord.word}\\b`, 'gi');
     sentence = sentence.replace(wordRegex, '<span class="blank">_______</span>');
 
     // Update UI
-    document.querySelector('.quiz-level').innerHTML = `<i class="fas fa-layer-group"></i> Level ${level}`;
+    const levelLabel = filter === 'difficult' ? 'Difficult Words' : `Level ${filter}`;
+    document.querySelector('.quiz-level').innerHTML = `<i class="fas fa-layer-group"></i> ${levelLabel} (${remaining} remaining)`;
     document.getElementById('quiz-sentence-text').innerHTML = sentence;
 
     // Generate options
@@ -188,8 +245,9 @@ document.getElementById('next-question-btn')?.addEventListener('click', () => {
     loadQuizQuestion();
 });
 
-// Level selector change
+// Level selector change - reset studied words when changing level
 document.getElementById('level-select')?.addEventListener('change', () => {
+    quizStudiedWords = [];
     loadQuizQuestion();
 });
 
@@ -197,36 +255,37 @@ document.getElementById('level-select')?.addEventListener('change', () => {
 
 let currentFlashcard = null;
 let flashcardPool = [];
+let flashcardStudied = []; // Track studied cards this session
 
 async function loadFlashcard() {
     const filter = document.getElementById('flashcard-level-select').value;
 
-    let query;
     if (filter === 'difficult') {
         // Load difficult words
         if (difficultWords.length === 0) {
             showNoFlashcards('No difficult words marked yet. Study some flashcards and mark words as difficult!');
             return;
         }
-        // Get difficult words from Firebase
+        // Get ALL difficult words from Firebase
         flashcardPool = [];
-        for (const wordId of difficultWords.slice(0, 50)) {
+        for (const wordId of difficultWords) {
             const doc = await db.collection('words').doc(wordId).get();
             if (doc.exists) {
                 flashcardPool.push({ id: doc.id, ...doc.data() });
             }
         }
     } else if (filter === 'all') {
-        const snapshot = await db.collection('words').limit(100).get();
+        // Get ALL words (paginated fetch)
+        const snapshot = await db.collection('words').get();
         flashcardPool = [];
         snapshot.forEach(doc => {
             flashcardPool.push({ id: doc.id, ...doc.data() });
         });
     } else {
         const level = parseInt(filter);
+        // Get ALL words at this level
         const snapshot = await db.collection('words')
             .where('level', '==', level)
-            .limit(100)
             .get();
         flashcardPool = [];
         snapshot.forEach(doc => {
@@ -239,9 +298,36 @@ async function loadFlashcard() {
         return;
     }
 
-    // Pick random card
-    currentFlashcard = flashcardPool[Math.floor(Math.random() * flashcardPool.length)];
+    // Filter out already studied cards
+    let availableCards = flashcardPool.filter(c => !flashcardStudied.includes(c.id));
+
+    // If all cards studied, offer restart
+    if (availableCards.length === 0) {
+        showFlashcardComplete();
+        return;
+    }
+
+    // Pick random card from remaining
+    currentFlashcard = availableCards[Math.floor(Math.random() * availableCards.length)];
+    flashcardStudied.push(currentFlashcard.id);
     displayFlashcard();
+}
+
+function showFlashcardComplete() {
+    document.getElementById('flashcard-card').innerHTML = `
+        <div class="no-reviews">
+            <i class="fas fa-trophy"></i>
+            <p>You've studied all ${flashcardPool.length} cards in this set!</p>
+            <p style="font-size: 0.875rem; margin-top: 8px;">Great work completing the full list.</p>
+            <button class="btn primary" id="restart-flashcards-btn" style="margin-top: 16px;">
+                <i class="fas fa-redo"></i> Start Over
+            </button>
+        </div>
+    `;
+    document.getElementById('restart-flashcards-btn').addEventListener('click', () => {
+        flashcardStudied = [];
+        loadFlashcard();
+    });
 }
 
 function showNoFlashcards(message) {
@@ -256,11 +342,14 @@ function showNoFlashcards(message) {
 function displayFlashcard() {
     const card = document.getElementById('flashcard-card');
     const isDifficult = difficultWords.includes(currentFlashcard.id);
+    const remaining = flashcardPool.length - flashcardStudied.length;
+    const filter = document.getElementById('flashcard-level-select').value;
+    const filterLabel = filter === 'difficult' ? 'Difficult' : (filter === 'all' ? 'All' : `Level ${filter}`);
 
     card.innerHTML = `
         <div class="card-inner">
             <div class="flashcard-front">
-                <span class="word-level"><i class="fas fa-layer-group"></i> Level ${currentFlashcard.level || '?'}</span>
+                <span class="word-level"><i class="fas fa-layer-group"></i> ${filterLabel} (${remaining} remaining)</span>
                 <h3 class="flashcard-word">${currentFlashcard.word}</h3>
                 <p class="flashcard-pos">${currentFlashcard.partOfSpeech || ''}</p>
                 <button class="btn primary show-flashcard-answer">
@@ -330,8 +419,9 @@ async function toggleDifficult() {
     });
 }
 
-// Flashcard level selector
+// Flashcard level selector - reset studied cards when changing filter
 document.getElementById('flashcard-level-select')?.addEventListener('change', () => {
+    flashcardStudied = [];
     loadFlashcard();
 });
 
