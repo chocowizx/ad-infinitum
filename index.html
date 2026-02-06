@@ -86,7 +86,10 @@
                 </div>
                 <div class="nav-links">
                     <a href="#" class="nav-link active" data-screen="learn">
-                        <i class="fas fa-book-open"></i> Learn
+                        <i class="fas fa-pencil-alt"></i> Practice
+                    </a>
+                    <a href="#" class="nav-link" data-screen="flashcards">
+                        <i class="fas fa-clone"></i> Flashcards
                     </a>
                     <a href="#" class="nav-link" data-screen="review">
                         <i class="fas fa-redo"></i> Review
@@ -112,7 +115,7 @@
                 </div>
             </nav>
 
-            <!-- Learn Section -->
+            <!-- Learn Section (Fill-in-the-blank Quiz) -->
             <div id="learn-section" class="section active">
                 <div class="section-bg">
                     <img src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1920&q=80" alt="">
@@ -120,8 +123,8 @@
                 <div class="section-content">
                     <div class="section-header">
                         <div class="header-text">
-                            <h2>Learn New Words</h2>
-                            <p>Build your vocabulary one word at a time</p>
+                            <h2>Practice</h2>
+                            <p>SAT-style vocabulary questions</p>
                         </div>
                         <div class="level-selector">
                             <select id="level-select">
@@ -134,56 +137,108 @@
                         </div>
                     </div>
 
-                    <div id="word-card" class="card flashcard">
-                        <div class="card-inner">
-                            <div class="card-front">
-                                <span class="word-level"><i class="fas fa-layer-group"></i> Level 1</span>
-                                <h3 class="word"></h3>
-                                <p class="part-of-speech"></p>
-                                <button class="btn primary show-answer">
-                                    <i class="fas fa-eye"></i> Reveal Answer
+                    <div id="quiz-card" class="card quiz-card">
+                        <div class="quiz-header">
+                            <span class="quiz-level"><i class="fas fa-layer-group"></i> Level 1</span>
+                            <span class="quiz-progress">Question <span id="quiz-current">1</span></span>
+                        </div>
+                        <div class="quiz-sentence">
+                            <p id="quiz-sentence-text">Loading question...</p>
+                        </div>
+                        <div class="quiz-options" id="quiz-options">
+                            <!-- Options will be inserted here -->
+                        </div>
+                        <div id="quiz-feedback" class="quiz-feedback hidden">
+                            <div class="feedback-content">
+                                <div class="feedback-word">
+                                    <h3 id="feedback-word"></h3>
+                                    <span id="feedback-pos"></span>
+                                </div>
+                                <p id="feedback-definition" class="feedback-definition"></p>
+                                <button class="btn primary" id="next-question-btn">
+                                    <i class="fas fa-arrow-right"></i> Next Question
                                 </button>
-                            </div>
-                            <div class="card-back hidden">
-                                <div class="answer-content">
-                                    <h3 class="word"></h3>
-                                    <span class="part-of-speech"></span>
-                                    <div class="definition-box">
-                                        <p class="definition"></p>
-                                    </div>
-                                    <div class="tldr-box">
-                                        <span class="tldr-label">TL;DR</span>
-                                        <p class="definition-simple"><span></span></p>
-                                    </div>
-                                    <p class="korean"></p>
-                                    <div class="example-box">
-                                        <i class="fas fa-quote-left"></i>
-                                        <p class="example"><em></em></p>
-                                    </div>
-                                </div>
-                                <div class="rating-buttons">
-                                    <button class="btn rating wrong" data-rating="1">
-                                        <i class="fas fa-times"></i> Didn't Know
-                                    </button>
-                                    <button class="btn rating okay" data-rating="3">
-                                        <i class="fas fa-check"></i> Got It
-                                    </button>
-                                    <button class="btn rating easy" data-rating="5">
-                                        <i class="fas fa-bolt"></i> Easy!
-                                    </button>
-                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div class="session-stats">
                         <div class="stat">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Correct: <strong id="session-correct">0</strong></span>
+                        </div>
+                        <div class="stat">
                             <i class="fas fa-book"></i>
-                            <span>Words today: <strong id="session-count">0</strong></span>
+                            <span>Total: <strong id="session-count">0</strong></span>
                         </div>
                         <div class="stat">
                             <i class="fas fa-fire"></i>
                             <span>Streak: <strong id="streak-count">0</strong> days</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flashcards Section -->
+            <div id="flashcards-section" class="section">
+                <div class="section-bg">
+                    <img src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1920&q=80" alt="">
+                </div>
+                <div class="section-content">
+                    <div class="section-header">
+                        <div class="header-text">
+                            <h2>Flashcards</h2>
+                            <p>Study words and mark difficult ones for extra practice</p>
+                        </div>
+                        <div class="level-selector">
+                            <select id="flashcard-level-select">
+                                <option value="all">All Levels</option>
+                                <option value="difficult">Difficult Words</option>
+                                <option value="1">Level 1</option>
+                                <option value="2">Level 2</option>
+                                <option value="3">Level 3</option>
+                                <option value="4">Level 4</option>
+                                <option value="5">Level 5</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="flashcard-card" class="card flashcard">
+                        <div class="card-inner">
+                            <div class="flashcard-front">
+                                <span class="word-level"><i class="fas fa-layer-group"></i> Level 1</span>
+                                <h3 class="flashcard-word"></h3>
+                                <p class="flashcard-pos"></p>
+                                <button class="btn primary show-flashcard-answer">
+                                    <i class="fas fa-eye"></i> Reveal Answer
+                                </button>
+                            </div>
+                            <div class="flashcard-back hidden">
+                                <div class="answer-content">
+                                    <h3 class="flashcard-word-back"></h3>
+                                    <span class="flashcard-pos-back"></span>
+                                    <div class="definition-box">
+                                        <p class="flashcard-definition"></p>
+                                    </div>
+                                    <div class="tldr-box">
+                                        <span class="tldr-label">TL;DR</span>
+                                        <p class="flashcard-tldr"></p>
+                                    </div>
+                                    <p class="flashcard-korean"></p>
+                                    <div class="example-box">
+                                        <i class="fas fa-quote-left"></i>
+                                        <p class="flashcard-example"></p>
+                                    </div>
+                                </div>
+                                <div class="flashcard-actions">
+                                    <button class="btn mark-difficult" id="mark-difficult-btn">
+                                        <i class="fas fa-bookmark"></i> Mark Difficult
+                                    </button>
+                                    <button class="btn primary next-flashcard" id="next-flashcard-btn">
+                                        <i class="fas fa-arrow-right"></i> Next Card
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1,8 +1,11 @@
 // App state
 let currentWord = null;
+let currentOptions = [];
 let sessionCount = 0;
-let wordsQueue = [];
+let sessionCorrect = 0;
+let wordsPool = [];
 let userProgress = {};
+let difficultWords = [];
 
 // Spaced repetition intervals (in days)
 const SR_INTERVALS = [1, 3, 7, 14, 30, 90];
@@ -28,6 +31,8 @@ navLinks.forEach(link => {
         });
 
         // Load data for section
+        if (targetScreen === 'learn') loadQuizQuestion();
+        if (targetScreen === 'flashcards') loadFlashcard();
         if (targetScreen === 'progress') loadProgress();
         if (targetScreen === 'leaderboard') loadLeaderboard();
         if (targetScreen === 'review') loadReviewWords();
@@ -37,7 +42,8 @@ navLinks.forEach(link => {
 // Initialize app
 async function initApp() {
     await loadUserProgress();
-    await loadNextWord();
+    await loadDifficultWords();
+    await loadQuizQuestion();
     updateSessionStats();
 }
 
@@ -52,96 +58,296 @@ async function loadUserProgress() {
     });
 }
 
-// Load next word to learn
-async function loadNextWord() {
-    const level = document.getElementById('level-select').value;
+// Load user's difficult words
+async function loadDifficultWords() {
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    difficultWords = doc.data()?.difficultWords || [];
+}
 
-    // Get words user hasn't learned yet at this level
+// ==================== QUIZ (LEARN) SECTION ====================
+
+async function loadQuizQuestion() {
+    const level = parseInt(document.getElementById('level-select').value);
+
+    // Get words at this level
     const wordsSnapshot = await db.collection('words')
-        .where('level', '==', parseInt(level))
-        .limit(50)
+        .where('level', '==', level)
         .get();
 
-    const unlearnedWords = [];
+    const availableWords = [];
     wordsSnapshot.forEach(doc => {
-        if (!userProgress[doc.id]) {
-            unlearnedWords.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Only include words that have example sentences
+        if (data.example && data.example.trim()) {
+            availableWords.push({ id: doc.id, ...data });
         }
     });
 
-    if (unlearnedWords.length === 0) {
-        showNoWords();
+    if (availableWords.length < 4) {
+        document.getElementById('quiz-card').innerHTML = `
+            <div class="no-reviews">
+                <i class="fas fa-info-circle"></i>
+                <p>Not enough words with example sentences at this level.</p>
+                <p style="font-size: 0.875rem; margin-top: 8px;">Try a different level.</p>
+            </div>
+        `;
         return;
     }
 
-    // Pick random word
-    currentWord = unlearnedWords[Math.floor(Math.random() * unlearnedWords.length)];
-    displayWord(currentWord);
+    // Pick a random word as the correct answer
+    currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+
+    // Get distractors (same or higher level, non-synonyms)
+    const distractorSnapshot = await db.collection('words')
+        .where('level', '>=', level)
+        .limit(50)
+        .get();
+
+    const potentialDistractors = [];
+    distractorSnapshot.forEach(doc => {
+        if (doc.id !== currentWord.id) {
+            potentialDistractors.push({ id: doc.id, ...doc.data() });
+        }
+    });
+
+    // Shuffle and pick 3 distractors
+    const shuffled = potentialDistractors.sort(() => Math.random() - 0.5);
+    const distractors = shuffled.slice(0, 3);
+
+    // Create options array and shuffle
+    currentOptions = [currentWord, ...distractors].sort(() => Math.random() - 0.5);
+
+    displayQuizQuestion();
 }
 
-// Display word on card
-function displayWord(word) {
-    const cardFront = document.querySelector('.card-front');
-    const cardBack = document.querySelector('.card-back');
+function displayQuizQuestion() {
+    const level = document.getElementById('level-select').value;
 
-    // Front
-    cardFront.querySelector('.word-level').textContent = `Level ${word.level}`;
-    cardFront.querySelector('.word').textContent = word.word;
-    cardFront.querySelector('.part-of-speech').textContent = word.partOfSpeech || '';
+    // Create sentence with blank
+    let sentence = currentWord.example || `The word "${currentWord.word}" means ${currentWord.definition}`;
+    const wordRegex = new RegExp(`\\b${currentWord.word}\\b`, 'gi');
+    sentence = sentence.replace(wordRegex, '<span class="blank">_______</span>');
 
-    // Back
-    cardBack.querySelector('.word').textContent = word.word;
-    cardBack.querySelector('.part-of-speech').textContent = word.partOfSpeech || '';
-    cardBack.querySelector('.definition').textContent = word.definition || 'No definition available';
-    cardBack.querySelector('.definition-simple span').textContent = word.tldr || word.definition || '';
-    cardBack.querySelector('.korean').textContent = word.korean || '';
-    cardBack.querySelector('.example em').textContent = word.example || '';
+    // Update UI
+    document.querySelector('.quiz-level').innerHTML = `<i class="fas fa-layer-group"></i> Level ${level}`;
+    document.getElementById('quiz-sentence-text').innerHTML = sentence;
 
-    // Show front, hide back
-    cardFront.classList.remove('hidden');
-    cardBack.classList.add('hidden');
+    // Generate options
+    const optionsContainer = document.getElementById('quiz-options');
+    optionsContainer.innerHTML = currentOptions.map((opt, i) => `
+        <button class="quiz-option" data-index="${i}" data-word-id="${opt.id}">
+            ${String.fromCharCode(65 + i)}. ${opt.word}
+        </button>
+    `).join('');
+
+    // Add click handlers
+    document.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.addEventListener('click', () => handleQuizAnswer(btn));
+    });
+
+    // Hide feedback
+    document.getElementById('quiz-feedback').classList.add('hidden');
 }
 
-function showNoWords() {
-    const card = document.getElementById('word-card');
-    card.innerHTML = `
+async function handleQuizAnswer(selectedBtn) {
+    const selectedId = selectedBtn.dataset.wordId;
+    const isCorrect = selectedId === currentWord.id;
+
+    // Disable all options
+    document.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.disabled = true;
+        if (btn.dataset.wordId === currentWord.id) {
+            btn.classList.add('correct-answer');
+        }
+    });
+
+    // Mark selected
+    if (isCorrect) {
+        selectedBtn.classList.add('correct');
+        sessionCorrect++;
+    } else {
+        selectedBtn.classList.add('incorrect');
+    }
+
+    sessionCount++;
+    updateSessionStats();
+
+    // Record progress
+    await recordProgress(currentWord.id, isCorrect ? 5 : 1);
+
+    // Show feedback
+    const feedback = document.getElementById('quiz-feedback');
+    document.getElementById('feedback-word').textContent = currentWord.word;
+    document.getElementById('feedback-pos').textContent = currentWord.partOfSpeech || '';
+    document.getElementById('feedback-definition').textContent = currentWord.definition || '';
+    feedback.classList.remove('hidden');
+}
+
+// Next question button
+document.getElementById('next-question-btn')?.addEventListener('click', () => {
+    loadQuizQuestion();
+});
+
+// Level selector change
+document.getElementById('level-select')?.addEventListener('change', () => {
+    loadQuizQuestion();
+});
+
+// ==================== FLASHCARDS SECTION ====================
+
+let currentFlashcard = null;
+let flashcardPool = [];
+
+async function loadFlashcard() {
+    const filter = document.getElementById('flashcard-level-select').value;
+
+    let query;
+    if (filter === 'difficult') {
+        // Load difficult words
+        if (difficultWords.length === 0) {
+            showNoFlashcards('No difficult words marked yet. Study some flashcards and mark words as difficult!');
+            return;
+        }
+        // Get difficult words from Firebase
+        flashcardPool = [];
+        for (const wordId of difficultWords.slice(0, 50)) {
+            const doc = await db.collection('words').doc(wordId).get();
+            if (doc.exists) {
+                flashcardPool.push({ id: doc.id, ...doc.data() });
+            }
+        }
+    } else if (filter === 'all') {
+        const snapshot = await db.collection('words').limit(100).get();
+        flashcardPool = [];
+        snapshot.forEach(doc => {
+            flashcardPool.push({ id: doc.id, ...doc.data() });
+        });
+    } else {
+        const level = parseInt(filter);
+        const snapshot = await db.collection('words')
+            .where('level', '==', level)
+            .limit(100)
+            .get();
+        flashcardPool = [];
+        snapshot.forEach(doc => {
+            flashcardPool.push({ id: doc.id, ...doc.data() });
+        });
+    }
+
+    if (flashcardPool.length === 0) {
+        showNoFlashcards('No flashcards available for this selection.');
+        return;
+    }
+
+    // Pick random card
+    currentFlashcard = flashcardPool[Math.floor(Math.random() * flashcardPool.length)];
+    displayFlashcard();
+}
+
+function showNoFlashcards(message) {
+    document.getElementById('flashcard-card').innerHTML = `
         <div class="no-reviews">
-            <p>No more new words at this level!</p>
-            <p>Try a different level or review your learned words.</p>
+            <i class="fas fa-clone"></i>
+            <p>${message}</p>
         </div>
     `;
 }
 
-// Show answer button
-document.querySelector('.show-answer')?.addEventListener('click', () => {
-    document.querySelector('.card-front').classList.add('hidden');
-    document.querySelector('.card-back').classList.remove('hidden');
-});
+function displayFlashcard() {
+    const card = document.getElementById('flashcard-card');
+    const isDifficult = difficultWords.includes(currentFlashcard.id);
 
-// Rating buttons
-document.querySelectorAll('.btn.rating').forEach(btn => {
-    btn.addEventListener('click', async () => {
-        const rating = parseInt(btn.dataset.rating);
-        await recordProgress(currentWord.id, rating);
-        sessionCount++;
-        updateSessionStats();
-        await loadNextWord();
+    card.innerHTML = `
+        <div class="card-inner">
+            <div class="flashcard-front">
+                <span class="word-level"><i class="fas fa-layer-group"></i> Level ${currentFlashcard.level || '?'}</span>
+                <h3 class="flashcard-word">${currentFlashcard.word}</h3>
+                <p class="flashcard-pos">${currentFlashcard.partOfSpeech || ''}</p>
+                <button class="btn primary show-flashcard-answer">
+                    <i class="fas fa-eye"></i> Reveal Answer
+                </button>
+            </div>
+            <div class="flashcard-back hidden">
+                <div class="answer-content">
+                    <h3 class="flashcard-word-back" style="text-align: center; font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: 8px;">${currentFlashcard.word}</h3>
+                    <span class="flashcard-pos-back" style="display: block; text-align: center; background: var(--gray-100); padding: 4px 12px; border-radius: 4px; font-size: 0.8125rem; margin: 0 auto 20px; width: fit-content;">${currentFlashcard.partOfSpeech || ''}</span>
+                    <div class="definition-box">
+                        <p class="flashcard-definition">${currentFlashcard.definition || 'No definition available'}</p>
+                    </div>
+                    <div class="tldr-box">
+                        <span class="tldr-label">TL;DR</span>
+                        <p class="flashcard-tldr" style="display: inline;">${currentFlashcard.tldr || currentFlashcard.definition || ''}</p>
+                    </div>
+                    ${currentFlashcard.korean ? `<p class="flashcard-korean" style="text-align: center; color: var(--primary); font-size: 1.125rem; font-weight: 600; margin: 16px 0;">${currentFlashcard.korean}</p>` : ''}
+                    ${currentFlashcard.example ? `
+                        <div class="example-box">
+                            <i class="fas fa-quote-left"></i>
+                            <p class="flashcard-example"><em>${currentFlashcard.example}</em></p>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="flashcard-actions">
+                    <button class="btn mark-difficult ${isDifficult ? 'marked' : ''}" id="mark-difficult-btn">
+                        <i class="fas fa-bookmark"></i> ${isDifficult ? 'Marked Difficult' : 'Mark Difficult'}
+                    </button>
+                    <button class="btn primary next-flashcard" id="next-flashcard-btn">
+                        <i class="fas fa-arrow-right"></i> Next Card
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add event listeners
+    card.querySelector('.show-flashcard-answer').addEventListener('click', () => {
+        card.querySelector('.flashcard-front').classList.add('hidden');
+        card.querySelector('.flashcard-back').classList.remove('hidden');
     });
+
+    card.querySelector('#mark-difficult-btn').addEventListener('click', toggleDifficult);
+    card.querySelector('#next-flashcard-btn').addEventListener('click', loadFlashcard);
+}
+
+async function toggleDifficult() {
+    const btn = document.getElementById('mark-difficult-btn');
+    const wordId = currentFlashcard.id;
+
+    if (difficultWords.includes(wordId)) {
+        // Remove from difficult
+        difficultWords = difficultWords.filter(id => id !== wordId);
+        btn.classList.remove('marked');
+        btn.innerHTML = '<i class="fas fa-bookmark"></i> Mark Difficult';
+    } else {
+        // Add to difficult
+        difficultWords.push(wordId);
+        btn.classList.add('marked');
+        btn.innerHTML = '<i class="fas fa-bookmark"></i> Marked Difficult';
+    }
+
+    // Save to Firebase
+    await db.collection('users').doc(currentUser.uid).update({
+        difficultWords: difficultWords
+    });
+}
+
+// Flashcard level selector
+document.getElementById('flashcard-level-select')?.addEventListener('change', () => {
+    loadFlashcard();
 });
 
-// Record word progress
+// ==================== RECORD PROGRESS ====================
+
 async function recordProgress(wordId, rating) {
     const now = new Date();
     const isCorrect = rating >= 3;
 
-    // Calculate next review date based on spaced repetition
     let intervalIndex = 0;
     if (userProgress[wordId]) {
         intervalIndex = userProgress[wordId].intervalIndex || 0;
         if (isCorrect) {
             intervalIndex = Math.min(intervalIndex + 1, SR_INTERVALS.length - 1);
         } else {
-            intervalIndex = 0; // Reset on wrong answer
+            intervalIndex = 0;
         }
     }
 
@@ -155,10 +361,9 @@ async function recordProgress(wordId, rating) {
         intervalIndex: intervalIndex,
         timesReviewed: (userProgress[wordId]?.timesReviewed || 0) + 1,
         timesCorrect: (userProgress[wordId]?.timesCorrect || 0) + (isCorrect ? 1 : 0),
-        mastered: intervalIndex >= 4 // Mastered after 4 successful reviews
+        mastered: intervalIndex >= 4
     };
 
-    // Save to user's progress
     await db.collection('users').doc(currentUser.uid)
         .collection('wordProgress').doc(wordId).set(progressData);
 
@@ -187,19 +392,15 @@ async function recordProgress(wordId, rating) {
 // Update session stats display
 function updateSessionStats() {
     document.getElementById('session-count').textContent = sessionCount;
+    document.getElementById('session-correct').textContent = sessionCorrect;
     document.getElementById('streak-count').textContent = userProfile.currentStreak || 0;
 }
 
-// Level selector change
-document.getElementById('level-select')?.addEventListener('change', () => {
-    loadNextWord();
-});
+// ==================== REVIEW SECTION ====================
 
-// Review words queue
 let reviewQueue = [];
 let currentReviewIndex = 0;
 
-// Load review words (spaced repetition)
 async function loadReviewWords() {
     const now = new Date();
     reviewQueue = [];
@@ -221,7 +422,7 @@ async function loadReviewWords() {
             <div class="no-reviews">
                 <i class="fas fa-check-circle"></i>
                 <p>All caught up! No words due for review.</p>
-                <p style="font-size: 0.875rem; margin-top: 8px;">Keep learning new words to build your review queue.</p>
+                <p style="font-size: 0.875rem; margin-top: 8px;">Keep practicing to build your review queue.</p>
             </div>
         `;
     } else {
@@ -230,7 +431,6 @@ async function loadReviewWords() {
     }
 }
 
-// Display current review word
 function displayReviewWord() {
     if (currentReviewIndex >= reviewQueue.length) {
         document.getElementById('review-card').innerHTML = `
@@ -292,7 +492,6 @@ function displayReviewWord() {
         </div>
     `;
 
-    // Attach event listeners
     reviewCard.querySelector('.show-review-answer').addEventListener('click', () => {
         reviewCard.querySelector('.review-card-front').classList.add('hidden');
         reviewCard.querySelector('.review-card-back').classList.remove('hidden');
@@ -310,9 +509,9 @@ function displayReviewWord() {
     });
 }
 
-// Load progress stats
+// ==================== PROGRESS SECTION ====================
+
 async function loadProgress() {
-    // Refresh user profile
     const doc = await db.collection('users').doc(currentUser.uid).get();
     userProfile = doc.data();
 
@@ -325,22 +524,20 @@ async function loadProgress() {
     document.getElementById('accuracy').textContent = `${accuracy}%`;
     document.getElementById('current-streak').textContent = `${userProfile.currentStreak || 0} days`;
 
-    // Load level progress
     await loadLevelProgress();
 }
 
 async function loadLevelProgress() {
     const levelBars = document.getElementById('level-bars');
-    levelBars.innerHTML = '';
+    levelBars.innerHTML = '<p style="color: var(--gray-500); text-align: center;">Loading...</p>';
 
+    let html = '';
     for (let level = 1; level <= 5; level++) {
-        // Count total words at this level
         const totalSnapshot = await db.collection('words')
             .where('level', '==', level)
             .get();
         const totalWords = totalSnapshot.size;
 
-        // Count learned words at this level
         let learnedCount = 0;
         for (const [wordId, progress] of Object.entries(userProgress)) {
             const wordDoc = await db.collection('words').doc(wordId).get();
@@ -350,9 +547,9 @@ async function loadLevelProgress() {
         }
 
         const percentage = totalWords > 0 ? Math.round((learnedCount / totalWords) * 100) : 0;
-
         const levelNames = ['', 'Basic', 'Elementary', 'Intermediate', 'Advanced', 'Expert'];
-        levelBars.innerHTML += `
+
+        html += `
             <div class="level-bar">
                 <div class="level-bar-label">
                     <span>Level ${level} - ${levelNames[level]}</span>
@@ -364,9 +561,11 @@ async function loadLevelProgress() {
             </div>
         `;
     }
+    levelBars.innerHTML = html;
 }
 
-// Load leaderboard
+// ==================== LEADERBOARD SECTION ====================
+
 async function loadLeaderboard() {
     const snapshot = await db.collection('users')
         .orderBy('wordsMastered', 'desc')
