@@ -31,6 +31,7 @@
     <textarea id="jsonInput" placeholder="Or paste the content of words_processed.json here..."></textarea>
 
     <button id="importBtn" onclick="startImport()">Import Words</button>
+    <button id="clearBtn" onclick="clearAllWords()" style="background:#ef4444; margin-left:10px;">Clear All Words First</button>
 
     <div id="status"></div>
 
@@ -87,6 +88,53 @@
             }
         }
 
+        async function clearAllWords() {
+            if (!confirm('This will DELETE ALL WORDS from Firebase. Are you sure?')) {
+                return;
+            }
+            if (!confirm('REALLY delete all words? This cannot be undone!')) {
+                return;
+            }
+
+            document.getElementById('clearBtn').disabled = true;
+            status.innerHTML = '<p>Deleting all words... This may take a few minutes.</p>';
+
+            try {
+                const snapshot = await db.collection('words').get();
+                const total = snapshot.size;
+                let deleted = 0;
+
+                // Delete in batches of 50
+                const batchSize = 50;
+                let batch = db.batch();
+                let count = 0;
+
+                for (const doc of snapshot.docs) {
+                    batch.delete(doc.ref);
+                    count++;
+                    deleted++;
+
+                    if (count >= batchSize) {
+                        await batch.commit();
+                        batch = db.batch();
+                        count = 0;
+                        status.innerHTML = '<p>Deleted ' + deleted + ' / ' + total + ' words...</p>';
+                    }
+                }
+
+                // Commit remaining
+                if (count > 0) {
+                    await batch.commit();
+                }
+
+                status.innerHTML = '<p class="success">All ' + total + ' words deleted! Now load your JSON file and click Import.</p>';
+            } catch (e) {
+                status.innerHTML = '<p class="error">Error deleting: ' + e.message + '</p>';
+            }
+
+            document.getElementById('clearBtn').disabled = false;
+        }
+
         async function startImport() {
             const jsonText = document.getElementById('jsonInput').value.trim();
             if (!jsonText) {
@@ -123,6 +171,7 @@
                         korean: word.korean || '',
                         partOfSpeech: word.partOfSpeech || '',
                         example: word.example || '',
+                        passage: word.passage || '',
                         level: word.level || 1,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });

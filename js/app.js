@@ -239,18 +239,22 @@ function displayQuizQuestion() {
     const filter = document.getElementById('level-select').value;
     const remaining = moduleQueue.length;
 
-    // Create sentence with blank - generate fallback if no example
+    // Create passage with blank - use passage field (3-sentence reading), fallback to example
     let sentence;
-    if (currentWord.example && currentWord.example.trim()) {
+    if (currentWord.passage && currentWord.passage.trim()) {
+        sentence = currentWord.passage;
+    } else if (currentWord.example && currentWord.example.trim()) {
         sentence = currentWord.example;
     } else if (currentWord.definition) {
-        // Generate a fill-in-the-blank from the definition
         sentence = `A word meaning "${currentWord.definition}" is _______.`;
     } else {
         sentence = `The word "${currentWord.word}" fits in this blank: _______`;
     }
 
-    const wordRegex = new RegExp(`\\b${currentWord.word}\\b`, 'gi');
+    // Replace the word with a blank (case-insensitive, including common morphological variations)
+    // Match: word, words, word's, worded, wording, wordly, etc.
+    const baseWord = currentWord.word.replace(/e$/, ''); // handle words ending in 'e'
+    const wordRegex = new RegExp(`\\b${currentWord.word}(s|ed|ing|ly|er|est|ment|ness|tion|ation)?\\b|\\b${baseWord}(ing|ed|er|est)\\b`, 'gi');
     sentence = sentence.replace(wordRegex, '<span class="blank">_______</span>');
 
     // Update UI
