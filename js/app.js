@@ -142,6 +142,51 @@ let currentModule = 1;
 let moduleProgress = 0;
 let moduleCorrect = 0;
 
+// Original quiz card HTML structure (restored when switching from message view)
+const QUIZ_CARD_HTML = `
+    <div class="quiz-header">
+        <span class="quiz-level"><i class="fas fa-layer-group"></i> Level 1</span>
+        <span class="quiz-progress">Question <span id="quiz-current">1</span></span>
+    </div>
+    <div class="quiz-sentence">
+        <p id="quiz-sentence-text">Loading question...</p>
+    </div>
+    <div class="quiz-options" id="quiz-options"></div>
+    <div id="quiz-feedback" class="quiz-feedback hidden">
+        <div class="feedback-content">
+            <div class="feedback-word">
+                <h3 id="feedback-word"></h3>
+                <span id="feedback-pos"></span>
+            </div>
+            <p id="feedback-definition" class="feedback-definition"></p>
+            <button class="btn primary" id="next-question-btn">
+                <i class="fas fa-arrow-right"></i> Next Question
+            </button>
+        </div>
+    </div>
+`;
+
+function showQuizMessage(icon, title, subtitle) {
+    document.getElementById('quiz-card').innerHTML = `
+        <div class="no-reviews">
+            <i class="fas fa-${icon}"></i>
+            <p>${title}</p>
+            <p style="font-size: 0.875rem; margin-top: 8px;">${subtitle}</p>
+        </div>
+    `;
+}
+
+function restoreQuizCard() {
+    // Restore quiz structure if it was replaced with a message
+    if (!document.getElementById('quiz-options')) {
+        document.getElementById('quiz-card').innerHTML = QUIZ_CARD_HTML;
+        // Re-attach next question button handler
+        document.getElementById('next-question-btn')?.addEventListener('click', () => {
+            loadQuizQuestion();
+        });
+    }
+}
+
 async function loadQuizQuestion() {
     const filter = document.getElementById('level-select').value;
 
@@ -160,13 +205,7 @@ async function loadQuizQuestion() {
     // Load words based on filter
     if (filter === 'difficult') {
         if (difficultWords.length === 0) {
-            document.getElementById('quiz-card').innerHTML = `
-                <div class="no-reviews">
-                    <i class="fas fa-bookmark"></i>
-                    <p>No difficult words marked yet.</p>
-                    <p style="font-size: 0.875rem; margin-top: 8px;">Mark words as difficult in Flashcards to practice them here.</p>
-                </div>
-            `;
+            showQuizMessage('bookmark', 'No difficult words marked yet.', 'Mark words as difficult in Flashcards to practice them here.');
             return;
         }
         quizAllWords = allWordsCache.filter(w => difficultWords.includes(w.id));
@@ -176,15 +215,12 @@ async function loadQuizQuestion() {
     }
 
     if (quizAllWords.length < 4) {
-        document.getElementById('quiz-card').innerHTML = `
-            <div class="no-reviews">
-                <i class="fas fa-info-circle"></i>
-                <p>Not enough words available (need at least 4).</p>
-                <p style="font-size: 0.875rem; margin-top: 8px;">Try a different level or mark more difficult words.</p>
-            </div>
-        `;
+        showQuizMessage('info-circle', 'Not enough words available (need at least 4).', 'Try a different level or mark more difficult words.');
         return;
     }
+
+    // Restore quiz card structure if it was replaced with a message
+    restoreQuizCard();
 
     // Initialize module if queue is empty
     if (moduleQueue.length === 0) {
