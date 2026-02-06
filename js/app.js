@@ -66,6 +66,71 @@ async function loadDifficultWords() {
 
 // ==================== QUIZ (LEARN) SECTION ====================
 
+// Helper function to apply suffix to a word with proper spelling rules
+function applySuffix(word, suffix) {
+    if (!suffix) return word;
+
+    const lowerWord = word.toLowerCase();
+
+    // Handle -ing suffix
+    if (suffix === 'ing') {
+        if (lowerWord.endsWith('ie')) {
+            return word.slice(0, -2) + 'ying';
+        } else if (lowerWord.endsWith('e') && !lowerWord.endsWith('ee')) {
+            return word.slice(0, -1) + 'ing';
+        } else if (/[aeiou][bcdfghjklmnpqrstvwxyz]$/.test(lowerWord) && lowerWord.length <= 6) {
+            // Double final consonant for short words (run -> running)
+            return word + word.slice(-1) + 'ing';
+        }
+        return word + 'ing';
+    }
+
+    // Handle -ed suffix
+    if (suffix === 'ed') {
+        if (lowerWord.endsWith('e')) {
+            return word + 'd';
+        } else if (lowerWord.endsWith('y') && !/[aeiou]y$/.test(lowerWord)) {
+            return word.slice(0, -1) + 'ied';
+        } else if (/[aeiou][bcdfghjklmnpqrstvwxyz]$/.test(lowerWord) && lowerWord.length <= 6) {
+            return word + word.slice(-1) + 'ed';
+        }
+        return word + 'ed';
+    }
+
+    // Handle -s suffix
+    if (suffix === 's') {
+        if (/[sxz]$/.test(lowerWord) || /[cs]h$/.test(lowerWord)) {
+            return word + 'es';
+        } else if (lowerWord.endsWith('y') && !/[aeiou]y$/.test(lowerWord)) {
+            return word.slice(0, -1) + 'ies';
+        }
+        return word + 's';
+    }
+
+    // Handle -er, -est (comparatives)
+    if (suffix === 'er' || suffix === 'est') {
+        if (lowerWord.endsWith('e')) {
+            return word + suffix.slice(1);
+        } else if (lowerWord.endsWith('y') && !/[aeiou]y$/.test(lowerWord)) {
+            return word.slice(0, -1) + 'i' + suffix;
+        }
+        return word + suffix;
+    }
+
+    // Handle -ly
+    if (suffix === 'ly') {
+        if (lowerWord.endsWith('le')) {
+            return word.slice(0, -2) + 'ly';
+        } else if (lowerWord.endsWith('y')) {
+            return word.slice(0, -1) + 'ily';
+        }
+        return word + 'ly';
+    }
+
+    // Default: just append
+    return word + suffix;
+}
+
 const QUESTIONS_PER_MODULE = 20;
 const TOTAL_MODULES = 5;
 
@@ -251,11 +316,39 @@ function displayQuizQuestion() {
         sentence = `The word "${currentWord.word}" fits in this blank: _______`;
     }
 
-    // Replace the word with a blank (case-insensitive, including common morphological variations)
-    // Match: word, words, word's, worded, wording, wordly, etc.
+    // Replace the word with a blank and detect the suffix used
     const baseWord = currentWord.word.replace(/e$/, ''); // handle words ending in 'e'
-    const wordRegex = new RegExp(`\\b${currentWord.word}(s|ed|ing|ly|er|est|ment|ness|tion|ation)?\\b|\\b${baseWord}(ing|ed|er|est)\\b`, 'gi');
-    sentence = sentence.replace(wordRegex, '<span class="blank">_______</span>');
+    const wordRegex = new RegExp(`\\b(${currentWord.word}|${baseWord})(s|ed|ing|ly|er|est|ment|ness|tion|ation|'s)?\\b`, 'gi');
+
+    // Find the first match to detect the suffix
+    let detectedSuffix = '';
+    const match = sentence.match(wordRegex);
+    if (match && match[0]) {
+        const matchedWord = match[0].toLowerCase();
+        const base = currentWord.word.toLowerCase();
+        const baseNoE = baseWord.toLowerCase();
+        if (matchedWord !== base && matchedWord !== baseNoE) {
+            // Extract suffix
+            if (matchedWord.startsWith(base)) {
+                detectedSuffix = matchedWord.slice(base.length);
+            } else if (matchedWord.startsWith(baseNoE)) {
+                detectedSuffix = matchedWord.slice(baseNoE.length);
+            }
+        }
+    }
+
+    // Store suffix for answer options
+    currentWord.detectedSuffix = detectedSuffix;
+
+    // Replace only the FIRST occurrence (not global replace)
+    let replaced = false;
+    sentence = sentence.replace(wordRegex, (match) => {
+        if (!replaced) {
+            replaced = true;
+            return '<span class="blank">_______</span>';
+        }
+        return match; // Keep subsequent occurrences as-is
+    });
 
     // Update UI
     const levelLabel = filter === 'difficult' ? 'Difficult Words' : `Level ${filter}`;
@@ -266,13 +359,19 @@ function displayQuizQuestion() {
     `;
     document.getElementById('quiz-sentence-text').innerHTML = sentence;
 
-    // Generate options
+    // Generate options with matching suffix/tense
     const optionsContainer = document.getElementById('quiz-options');
-    optionsContainer.innerHTML = currentOptions.map((opt, i) => `
-        <button class="quiz-option" data-index="${i}" data-word-id="${opt.id}">
-            ${String.fromCharCode(65 + i)}. ${opt.word}
-        </button>
-    `).join('');
+    optionsContainer.innerHTML = currentOptions.map((opt, i) => {
+        let displayWord = opt.word;
+        if (detectedSuffix) {
+            displayWord = applySuffix(opt.word, detectedSuffix);
+        }
+        return `
+            <button class="quiz-option" data-index="${i}" data-word-id="${opt.id}">
+                ${String.fromCharCode(65 + i)}. ${displayWord}
+            </button>
+        `;
+    }).join('');
 
     // Add click handlers
     document.querySelectorAll('.quiz-option').forEach(btn => {
