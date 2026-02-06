@@ -40,12 +40,13 @@ document.getElementById('login-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('signup-btn').addEventListener('click', async () => {
+    const realName = document.getElementById('signup-name').value;
     const email = document.getElementById('signup-email').value;
     const password = document.getElementById('signup-password').value;
     const satScore = document.getElementById('signup-sat').value;
 
-    if (!email || !password) {
-        showAuthError('Please fill in email and password');
+    if (!realName || !email || !password) {
+        showAuthError('Please fill in your name, email and password');
         return;
     }
 
@@ -60,7 +61,8 @@ document.getElementById('signup-btn').addEventListener('click', async () => {
         // Create user profile
         await db.collection('users').doc(userCredential.user.uid).set({
             email: email,
-            displayName: generateDisplayName(),
+            realName: realName,  // Real name visible only to admin
+            displayName: generateDisplayName(),  // Anonymous display name for leaderboard
             satScore: satScore ? parseInt(satScore) : null,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             wordsLearned: 0,

@@ -66,8 +66,16 @@ async function loadDifficultWords() {
 
 // ==================== QUIZ (LEARN) SECTION ====================
 
-let quizStudiedWords = []; // Track words studied this session
+const QUESTIONS_PER_MODULE = 20;
+const TOTAL_MODULES = 5;
+
 let quizAllWords = []; // All available words for current filter
+let allWordsCache = []; // Cache of all words for distractors
+let moduleQueue = []; // Current module's question queue
+let wrongAnswers = []; // Words answered incorrectly (to repeat)
+let currentModule = 1;
+let moduleProgress = 0;
+let moduleCorrect = 0;
 
 async function loadQuizQuestion() {
     const filter = document.getElementById('level-select').value;
@@ -75,9 +83,17 @@ async function loadQuizQuestion() {
     // Reload difficult words in case they were updated in flashcards
     await loadDifficultWords();
 
+    // Load all words for distractor pool (cached)
+    if (allWordsCache.length === 0) {
+        const allSnapshot = await db.collection('words').get();
+        allWordsCache = [];
+        allSnapshot.forEach(doc => {
+            allWordsCache.push({ id: doc.id, ...doc.data() });
+        });
+    }
+
     // Load words based on filter
     if (filter === 'difficult') {
-        // Load difficult words
         if (difficultWords.length === 0) {
             document.getElementById('quiz-card').innerHTML = `
                 <div class="no-reviews">
@@ -88,46 +104,10 @@ async function loadQuizQuestion() {
             `;
             return;
         }
-        quizAllWords = [];
-        for (const wordId of difficultWords) {
-            const doc = await db.collection('words').doc(wordId).get();
-            if (doc.exists) {
-                quizAllWords.push({ id: doc.id, ...doc.data() });
-            }
-        }
+        quizAllWords = allWordsCache.filter(w => difficultWords.includes(w.id));
     } else {
-        const wordsSnapshot = await db.collection('words')
-            .where('level', '==', parseInt(filter))
-            .get();
-
-        quizAllWords = [];
-        wordsSnapshot.forEach(doc => {
-            const data = doc.data();
-            // Include all words, even without examples
-            quizAllWords.push({ id: doc.id, ...data });
-        });
-    }
-
-    // Filter out already studied words this session
-    let availableWords = quizAllWords.filter(w => !quizStudiedWords.includes(w.id));
-
-    // If all words studied, offer to restart
-    if (availableWords.length === 0 && quizAllWords.length > 0) {
-        document.getElementById('quiz-card').innerHTML = `
-            <div class="no-reviews">
-                <i class="fas fa-trophy"></i>
-                <p>You've studied all ${quizAllWords.length} words in this set!</p>
-                <p style="font-size: 0.875rem; margin-top: 8px;">Great work on completing the full list.</p>
-                <button class="btn primary" id="restart-quiz-btn" style="margin-top: 16px;">
-                    <i class="fas fa-redo"></i> Start Over
-                </button>
-            </div>
-        `;
-        document.getElementById('restart-quiz-btn').addEventListener('click', () => {
-            quizStudiedWords = [];
-            loadQuizQuestion();
-        });
-        return;
+        const level = parseInt(filter);
+        quizAllWords = allWordsCache.filter(w => w.level === level);
     }
 
     if (quizAllWords.length < 4) {
@@ -141,37 +121,123 @@ async function loadQuizQuestion() {
         return;
     }
 
-    // Pick a random word as the correct answer
-    currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
-    quizStudiedWords.push(currentWord.id);
+    // Initialize module if queue is empty
+    if (moduleQueue.length === 0) {
+        initializeModule();
+    }
 
-    // Get distractors (same or higher level than current word)
-    const currentLevel = currentWord.level || 1;
-    const distractorSnapshot = await db.collection('words')
-        .where('level', '>=', currentLevel)
-        .limit(50)
-        .get();
+    // Get next question from queue
+    if (moduleQueue.length === 0) {
+        showModuleComplete();
+        return;
+    }
 
-    const potentialDistractors = [];
-    distractorSnapshot.forEach(doc => {
-        if (doc.id !== currentWord.id) {
-            potentialDistractors.push({ id: doc.id, ...doc.data() });
+    currentWord = moduleQueue.shift();
+    await loadDistractors();
+    displayQuizQuestion();
+}
+
+function initializeModule() {
+    moduleProgress = 0;
+    moduleCorrect = 0;
+
+    // First add any wrong answers from previous attempts
+    moduleQueue = [...wrongAnswers];
+    wrongAnswers = [];
+
+    // Then fill remaining spots with new words
+    const shuffled = [...quizAllWords].sort(() => Math.random() - 0.5);
+    const usedIds = new Set(moduleQueue.map(w => w.id));
+
+    for (const word of shuffled) {
+        if (!usedIds.has(word.id) && moduleQueue.length < QUESTIONS_PER_MODULE) {
+            moduleQueue.push(word);
+            usedIds.add(word.id);
         }
+    }
+
+    // Shuffle the final queue
+    moduleQueue.sort(() => Math.random() - 0.5);
+}
+
+async function loadDistractors() {
+    const currentPOS = currentWord.partOfSpeech?.toLowerCase() || '';
+    const currentLevel = currentWord.level || 1;
+
+    // Get potential distractors - prioritize same part of speech and higher difficulty
+    let potentialDistractors = allWordsCache.filter(w => {
+        if (w.id === currentWord.id) return false;
+        return true;
     });
 
-    // Shuffle and pick 3 distractors
-    const shuffled = potentialDistractors.sort(() => Math.random() - 0.5);
-    const distractors = shuffled.slice(0, 3);
+    // Sort by: 1) same POS, 2) higher/same level, 3) random
+    potentialDistractors.sort((a, b) => {
+        const aPOS = a.partOfSpeech?.toLowerCase() || '';
+        const bPOS = b.partOfSpeech?.toLowerCase() || '';
+
+        // Prioritize same part of speech
+        const aSamePOS = aPOS === currentPOS ? 1 : 0;
+        const bSamePOS = bPOS === currentPOS ? 1 : 0;
+        if (aSamePOS !== bSamePOS) return bSamePOS - aSamePOS;
+
+        // Then prioritize same or higher level
+        const aHigherLevel = a.level >= currentLevel ? 1 : 0;
+        const bHigherLevel = b.level >= currentLevel ? 1 : 0;
+        if (aHigherLevel !== bHigherLevel) return bHigherLevel - aHigherLevel;
+
+        // Then random
+        return Math.random() - 0.5;
+    });
+
+    // Take top 3 as distractors
+    const distractors = potentialDistractors.slice(0, 3);
 
     // Create options array and shuffle
     currentOptions = [currentWord, ...distractors].sort(() => Math.random() - 0.5);
+}
 
-    displayQuizQuestion();
+function showModuleComplete() {
+    const accuracy = moduleProgress > 0 ? Math.round((moduleCorrect / moduleProgress) * 100) : 0;
+    const hasWrongAnswers = wrongAnswers.length > 0;
+
+    document.getElementById('quiz-card').innerHTML = `
+        <div class="no-reviews">
+            <i class="fas fa-trophy" style="color: #f59e0b;"></i>
+            <h3>Module ${currentModule} Complete!</h3>
+            <p style="font-size: 1.25rem; margin: 16px 0;">Score: ${moduleCorrect}/${moduleProgress} (${accuracy}%)</p>
+            ${hasWrongAnswers ? `<p style="color: #ef4444;">You'll review ${wrongAnswers.length} missed word(s) in the next module.</p>` : '<p style="color: #10b981;">Perfect! No words to review.</p>'}
+            ${currentModule < TOTAL_MODULES ? `
+                <button class="btn primary" id="next-module-btn" style="margin-top: 16px;">
+                    <i class="fas fa-arrow-right"></i> Start Module ${currentModule + 1}
+                </button>
+            ` : `
+                <p style="margin-top: 16px; font-weight: bold;">All 5 modules completed!</p>
+                <button class="btn primary" id="restart-modules-btn" style="margin-top: 16px;">
+                    <i class="fas fa-redo"></i> Start Over
+                </button>
+            `}
+        </div>
+    `;
+
+    if (currentModule < TOTAL_MODULES) {
+        document.getElementById('next-module-btn').addEventListener('click', () => {
+            currentModule++;
+            initializeModule();
+            loadQuizQuestion();
+        });
+    } else {
+        document.getElementById('restart-modules-btn').addEventListener('click', () => {
+            currentModule = 1;
+            wrongAnswers = [];
+            initializeModule();
+            loadQuizQuestion();
+        });
+    }
 }
 
 function displayQuizQuestion() {
     const filter = document.getElementById('level-select').value;
-    const remaining = quizAllWords.length - quizStudiedWords.length;
+    const remaining = moduleQueue.length;
 
     // Create sentence with blank - generate fallback if no example
     let sentence;
@@ -179,7 +245,7 @@ function displayQuizQuestion() {
         sentence = currentWord.example;
     } else if (currentWord.definition) {
         // Generate a fill-in-the-blank from the definition
-        sentence = `Someone who is ${currentWord.word.toLowerCase()} can be described as: ${currentWord.definition}`;
+        sentence = `A word meaning "${currentWord.definition}" is _______.`;
     } else {
         sentence = `The word "${currentWord.word}" fits in this blank: _______`;
     }
@@ -189,7 +255,11 @@ function displayQuizQuestion() {
 
     // Update UI
     const levelLabel = filter === 'difficult' ? 'Difficult Words' : `Level ${filter}`;
-    document.querySelector('.quiz-level').innerHTML = `<i class="fas fa-layer-group"></i> ${levelLabel} (${remaining} remaining)`;
+    document.querySelector('.quiz-level').innerHTML = `
+        <i class="fas fa-layer-group"></i> ${levelLabel} |
+        <strong>Module ${currentModule}/${TOTAL_MODULES}</strong> |
+        Q${moduleProgress + 1}/${QUESTIONS_PER_MODULE} (${remaining} left)
+    `;
     document.getElementById('quiz-sentence-text').innerHTML = sentence;
 
     // Generate options
@@ -213,6 +283,9 @@ async function handleQuizAnswer(selectedBtn) {
     const selectedId = selectedBtn.dataset.wordId;
     const isCorrect = selectedId === currentWord.id;
 
+    // Update module progress
+    moduleProgress++;
+
     // Disable all options
     document.querySelectorAll('.quiz-option').forEach(btn => {
         btn.disabled = true;
@@ -225,8 +298,13 @@ async function handleQuizAnswer(selectedBtn) {
     if (isCorrect) {
         selectedBtn.classList.add('correct');
         sessionCorrect++;
+        moduleCorrect++;
     } else {
         selectedBtn.classList.add('incorrect');
+        // Add to wrong answers for repetition in next module
+        if (!wrongAnswers.find(w => w.id === currentWord.id)) {
+            wrongAnswers.push(currentWord);
+        }
     }
 
     sessionCount++;
@@ -248,9 +326,13 @@ document.getElementById('next-question-btn')?.addEventListener('click', () => {
     loadQuizQuestion();
 });
 
-// Level selector change - reset studied words when changing level
+// Level selector change - reset modules when changing level
 document.getElementById('level-select')?.addEventListener('change', () => {
-    quizStudiedWords = [];
+    currentModule = 1;
+    moduleQueue = [];
+    wrongAnswers = [];
+    moduleProgress = 0;
+    moduleCorrect = 0;
     loadQuizQuestion();
 });
 
@@ -661,7 +743,7 @@ async function loadLevelProgress() {
 
 async function loadLeaderboard() {
     const snapshot = await db.collection('users')
-        .orderBy('wordsMastered', 'desc')
+        .orderBy('totalCorrect', 'desc')
         .limit(50)
         .get();
 
@@ -671,6 +753,8 @@ async function loadLeaderboard() {
     let rank = 1;
     snapshot.forEach(doc => {
         const user = doc.data();
+        if (user.isAdmin) return; // Skip admins
+
         const isCurrentUser = doc.id === currentUser.uid;
         const accuracy = user.totalAttempts > 0
             ? Math.round((user.totalCorrect / user.totalAttempts) * 100)
@@ -685,7 +769,7 @@ async function loadLeaderboard() {
             <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
                 <span><span class="rank-badge ${rankBadge}">${rank}</span></span>
                 <span>${user.displayName}${isCurrentUser ? ' (You)' : ''}</span>
-                <span>${user.wordsMastered || 0}</span>
+                <span>${user.totalCorrect || 0}</span>
                 <span>${accuracy}%</span>
             </div>
         `;

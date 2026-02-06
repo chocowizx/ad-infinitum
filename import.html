@@ -17,9 +17,18 @@
 <body>
     <h1>Import Vocabulary to Ad Infinitum</h1>
 
-    <p>Make sure you're logged in as admin first. Then paste the JSON content from <code>data/words_processed.json</code> below:</p>
+    <div id="login-section">
+        <h3>Login First</h3>
+        <input type="email" id="email" placeholder="Email" style="padding: 10px; margin: 5px; border-radius: 4px; border: 1px solid #444; background: #2a2a4e; color: #eee;">
+        <input type="password" id="password" placeholder="Password" style="padding: 10px; margin: 5px; border-radius: 4px; border: 1px solid #444; background: #2a2a4e; color: #eee;">
+        <button onclick="login()" style="padding: 10px 20px; margin: 5px;">Login</button>
+    </div>
 
-    <textarea id="jsonInput" placeholder="Paste the content of words_processed.json here..."></textarea>
+    <p>Select the <code>words_processed.json</code> file or paste its content below:</p>
+
+    <input type="file" id="fileInput" accept=".json" onchange="loadFile()" style="margin: 10px 0; padding: 10px; background: #2a2a4e; border-radius: 8px; color: #eee;">
+
+    <textarea id="jsonInput" placeholder="Or paste the content of words_processed.json here..."></textarea>
 
     <button id="importBtn" onclick="startImport()">Import Words</button>
 
@@ -47,11 +56,36 @@
         auth.onAuthStateChanged(user => {
             if (user) {
                 status.innerHTML = '<p class="success">Logged in as: ' + user.email + '</p>';
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('importBtn').disabled = false;
             } else {
-                status.innerHTML = '<p class="error">Not logged in. Please log in at index.html first, then come back here.</p>';
+                status.innerHTML = '<p class="error">Please log in first.</p>';
                 document.getElementById('importBtn').disabled = true;
             }
         });
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                status.innerHTML = '<p class="success">Login successful!</p>';
+            } catch (e) {
+                status.innerHTML = '<p class="error">Login failed: ' + e.message + '</p>';
+            }
+        }
+
+        function loadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('jsonInput').value = e.target.result;
+                    status.innerHTML = '<p class="success">File loaded! Click "Import Words" to start.</p>';
+                };
+                reader.readAsText(file);
+            }
+        }
 
         async function startImport() {
             const jsonText = document.getElementById('jsonInput').value.trim();
