@@ -72,6 +72,9 @@ let quizAllWords = []; // All available words for current filter
 async function loadQuizQuestion() {
     const filter = document.getElementById('level-select').value;
 
+    // Reload difficult words in case they were updated in flashcards
+    await loadDifficultWords();
+
     // Load words based on filter
     if (filter === 'difficult') {
         // Load difficult words
@@ -93,9 +96,8 @@ async function loadQuizQuestion() {
             }
         }
     } else {
-        const level = parseInt(filter);
         const wordsSnapshot = await db.collection('words')
-            .where('level', '==', level)
+            .where('level', '==', parseInt(filter))
             .get();
 
         quizAllWords = [];
@@ -143,9 +145,10 @@ async function loadQuizQuestion() {
     currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
     quizStudiedWords.push(currentWord.id);
 
-    // Get distractors (same or higher level, non-synonyms)
+    // Get distractors (same or higher level than current word)
+    const currentLevel = currentWord.level || 1;
     const distractorSnapshot = await db.collection('words')
-        .where('level', '>=', level)
+        .where('level', '>=', currentLevel)
         .limit(50)
         .get();
 
