@@ -97,37 +97,37 @@
             }
 
             document.getElementById('clearBtn').disabled = true;
-            status.innerHTML = '<p>Deleting all words... This may take a few minutes.</p>';
+            status.innerHTML = '<p>Counting words...</p>';
+
+            const delay = ms => new Promise(r => setTimeout(r, ms));
 
             try {
-                const snapshot = await db.collection('words').get();
-                const total = snapshot.size;
                 let deleted = 0;
+                let hasMore = true;
 
-                // Delete in batches of 50
-                const batchSize = 50;
-                let batch = db.batch();
-                let count = 0;
+                // Delete in chunks, fetching 100 at a time
+                while (hasMore) {
+                    const snapshot = await db.collection('words').limit(100).get();
 
-                for (const doc of snapshot.docs) {
-                    batch.delete(doc.ref);
-                    count++;
-                    deleted++;
-
-                    if (count >= batchSize) {
-                        await batch.commit();
-                        batch = db.batch();
-                        count = 0;
-                        status.innerHTML = '<p>Deleted ' + deleted + ' / ' + total + ' words...</p>';
+                    if (snapshot.empty) {
+                        hasMore = false;
+                        break;
                     }
-                }
 
-                // Commit remaining
-                if (count > 0) {
+                    const batch = db.batch();
+                    snapshot.docs.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+
                     await batch.commit();
+                    deleted += snapshot.size;
+                    status.innerHTML = '<p>Deleted ' + deleted + ' words so far...</p>';
+
+                    // Small delay to avoid rate limiting
+                    await delay(100);
                 }
 
-                status.innerHTML = '<p class="success">All ' + total + ' words deleted! Now load your JSON file and click Import.</p>';
+                status.innerHTML = '<p class="success">All ' + deleted + ' words deleted! Now load your JSON file and click Import.</p>';
             } catch (e) {
                 status.innerHTML = '<p class="error">Error deleting: ' + e.message + '</p>';
             }
