@@ -320,15 +320,49 @@ function updateStreakEffect() {
     const existingIndicator = document.querySelector('.streak-indicator');
     if (existingIndicator) existingIndicator.remove();
 
-    // Remove existing fire particles
+    // Remove existing particles
     const existingParticles = document.querySelector('.fire-particles');
     if (existingParticles) existingParticles.remove();
 
-    if (currentStreak >= 3) {
+    // Remove both effect classes
+    quizCard.classList.remove('on-fire', 'on-plasma');
+    delete quizCard.dataset.fireIntensity;
+
+    if (currentStreak >= 10) {
+        // Blue plasma effect for 10+ streak
+        quizCard.classList.add('on-plasma');
+
+        const intensity = Math.min(currentStreak - 9, 5);
+        quizCard.dataset.fireIntensity = intensity;
+
+        // Add streak indicator (plasma style)
+        const indicator = document.createElement('div');
+        indicator.className = 'streak-indicator plasma';
+        indicator.innerHTML = `
+            <span class="streak-flames">${'⚡'.repeat(Math.min(intensity + 2, 5))}</span>
+            <span class="streak-count">${currentStreak}</span>
+            <span class="streak-label">LEGENDARY!</span>
+        `;
+        quizCard.appendChild(indicator);
+
+        // Add plasma particles
+        const particles = document.createElement('div');
+        particles.className = 'fire-particles plasma';
+        for (let i = 0; i < 15 + intensity * 4; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'fire-particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 2 + 's';
+            particle.style.animationDuration = (0.8 + Math.random() * 1) + 's';
+            particles.appendChild(particle);
+        }
+        quizCard.appendChild(particles);
+
+    } else if (currentStreak >= 3) {
+        // Fire effect for 3-9 streak
         quizCard.classList.add('on-fire');
 
-        // Intensity increases with streak
-        const intensity = Math.min(currentStreak - 2, 5); // 1-5 intensity
+        const intensity = Math.min(currentStreak - 2, 5);
         quizCard.dataset.fireIntensity = intensity;
 
         // Add streak indicator
@@ -353,9 +387,6 @@ function updateStreakEffect() {
             particles.appendChild(particle);
         }
         quizCard.appendChild(particles);
-    } else {
-        quizCard.classList.remove('on-fire');
-        delete quizCard.dataset.fireIntensity;
     }
 }
 

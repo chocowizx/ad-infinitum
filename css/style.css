@@ -1463,61 +1463,29 @@ body {
 
 /* ==================== STREAK FIRE EFFECT ==================== */
 @keyframes fireGlow {
-    0% {
+    0%, 100% {
         box-shadow:
-            0 0 20px #ff6b35,
-            0 0 40px rgba(255, 107, 53, 0.6),
-            0 0 60px rgba(247, 147, 30, 0.4),
-            inset 0 0 20px rgba(255, 107, 53, 0.2);
-    }
-    25% {
-        box-shadow:
-            0 0 25px #ff8c42,
-            0 0 50px rgba(255, 140, 66, 0.7),
-            0 0 70px rgba(255, 204, 51, 0.4),
-            inset 0 0 25px rgba(255, 140, 66, 0.3);
+            0 0 15px rgba(255, 107, 53, 0.7),
+            0 0 30px rgba(255, 107, 53, 0.5),
+            0 0 45px rgba(247, 147, 30, 0.3);
     }
     50% {
         box-shadow:
-            0 0 30px #ffcc33,
-            0 0 60px rgba(255, 204, 51, 0.8),
-            0 0 80px rgba(255, 107, 53, 0.5),
-            inset 0 0 30px rgba(255, 204, 51, 0.3);
-    }
-    75% {
-        box-shadow:
-            0 0 25px #f7931e,
-            0 0 45px rgba(247, 147, 30, 0.7),
-            0 0 65px rgba(255, 140, 66, 0.4),
-            inset 0 0 25px rgba(247, 147, 30, 0.25);
-    }
-    100% {
-        box-shadow:
-            0 0 20px #ff6b35,
-            0 0 40px rgba(255, 107, 53, 0.6),
-            0 0 60px rgba(247, 147, 30, 0.4),
-            inset 0 0 20px rgba(255, 107, 53, 0.2);
+            0 0 20px rgba(255, 140, 66, 0.8),
+            0 0 40px rgba(255, 204, 51, 0.6),
+            0 0 60px rgba(255, 107, 53, 0.4);
     }
 }
 
-@keyframes firePulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.01); }
-}
-
-@keyframes fireWave {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+@keyframes borderGlow {
+    0%, 100% { border-color: #ff6b35; }
+    33% { border-color: #ff8c42; }
+    66% { border-color: #ffcc33; }
 }
 
 .quiz-card.on-fire {
-    animation: fireGlow 1.5s ease-in-out infinite, firePulse 0.8s ease-in-out infinite;
-    border: 3px solid transparent !important;
-    background:
-        linear-gradient(var(--gray-900), var(--gray-900)) padding-box,
-        linear-gradient(90deg, #ff6b35, #ffcc33, #ff6b35, #f7931e, #ff6b35) border-box;
-    background-size: 100% 100%, 300% 100%;
+    animation: fireGlow 2s ease-in-out infinite;
+    border: 3px solid #ff6b35 !important;
     position: relative;
     overflow: visible;
 }
@@ -1530,7 +1498,7 @@ body {
 /* Streak indicator */
 .streak-indicator {
     position: absolute;
-    top: -50px;
+    top: -55px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -1546,45 +1514,39 @@ body {
 }
 
 .streak-flames {
-    font-size: 24px;
-    animation: flameWave 0.5s ease-in-out infinite;
-    filter: drop-shadow(0 0 10px rgba(255, 107, 53, 0.8));
+    font-size: 20px;
+    animation: flameWave 0.6s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.8));
 }
 
 @keyframes flameWave {
-    0%, 100% { transform: translateY(0) scaleY(1); }
-    50% { transform: translateY(-3px) scaleY(1.1); }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
 }
 
 .streak-count {
-    font-size: 36px;
+    font-size: 32px;
     font-weight: 800;
     background: linear-gradient(180deg, #ffcc33 0%, #ff6b35 50%, #ff4500 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    text-shadow: 0 0 30px rgba(255, 107, 53, 0.8);
-    animation: countPulse 0.6s ease-in-out infinite;
     line-height: 1;
+    animation: countGlow 1s ease-in-out infinite;
 }
 
-@keyframes countPulse {
-    0%, 100% { transform: scale(1); filter: brightness(1); }
-    50% { transform: scale(1.1); filter: brightness(1.2); }
+@keyframes countGlow {
+    0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 107, 53, 0.8)); }
+    50% { filter: drop-shadow(0 0 15px rgba(255, 204, 51, 1)); }
 }
 
 .streak-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: #ff6b35;
     text-transform: uppercase;
     letter-spacing: 2px;
-    animation: labelGlow 1s ease-in-out infinite;
-}
-
-@keyframes labelGlow {
-    0%, 100% { text-shadow: 0 0 5px #ff6b35, 0 0 10px #ff6b35; }
-    50% { text-shadow: 0 0 10px #ffcc33, 0 0 20px #ff6b35, 0 0 30px #ff6b35; }
+    text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
 }
 
 /* Fire particles */
@@ -1601,17 +1563,17 @@ body {
 .fire-particle {
     position: absolute;
     bottom: -10px;
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: radial-gradient(circle, #ffcc33 0%, #ff6b35 50%, transparent 70%);
+    background: radial-gradient(circle, #ffcc33 0%, #ff6b35 60%, transparent 70%);
     animation: particleRise linear infinite;
     opacity: 0;
 }
 
 .fire-particle:nth-child(odd) {
-    width: 6px;
-    height: 12px;
+    width: 4px;
+    height: 10px;
     border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
     background: linear-gradient(to top, #ff4500, #ff6b35, #ffcc33);
 }
@@ -1621,28 +1583,95 @@ body {
         transform: translateY(0) scale(1) rotate(0deg);
         opacity: 0;
     }
-    10% {
-        opacity: 1;
+    15% {
+        opacity: 0.9;
     }
-    90% {
-        opacity: 0.8;
+    85% {
+        opacity: 0.6;
     }
     100% {
-        transform: translateY(-120px) scale(0.3) rotate(45deg);
+        transform: translateY(-100px) scale(0.2) rotate(30deg);
         opacity: 0;
     }
 }
 
-/* Intensity levels */
-.quiz-card[data-fire-intensity="2"] { animation-duration: 1.3s, 0.7s; }
-.quiz-card[data-fire-intensity="3"] { animation-duration: 1.1s, 0.6s; }
-.quiz-card[data-fire-intensity="4"] { animation-duration: 0.9s, 0.5s; }
-.quiz-card[data-fire-intensity="5"] {
-    animation-duration: 0.7s, 0.4s;
-    box-shadow:
-        0 0 40px #ff6b35,
-        0 0 80px rgba(255, 107, 53, 0.8),
-        0 0 120px rgba(255, 204, 51, 0.6) !important;
+/* ==================== PLASMA EFFECT (10+ streak) ==================== */
+@keyframes plasmaGlow {
+    0%, 100% {
+        box-shadow:
+            0 0 20px rgba(0, 150, 255, 0.8),
+            0 0 40px rgba(100, 200, 255, 0.6),
+            0 0 60px rgba(0, 100, 255, 0.4),
+            inset 0 0 20px rgba(0, 150, 255, 0.1);
+    }
+    50% {
+        box-shadow:
+            0 0 30px rgba(100, 200, 255, 0.9),
+            0 0 50px rgba(150, 220, 255, 0.7),
+            0 0 80px rgba(0, 150, 255, 0.5),
+            inset 0 0 30px rgba(100, 200, 255, 0.15);
+    }
+}
+
+@keyframes electricBorder {
+    0%, 100% { border-color: #00bfff; }
+    25% { border-color: #00ffff; }
+    50% { border-color: #87ceeb; }
+    75% { border-color: #1e90ff; }
+}
+
+.quiz-card.on-plasma {
+    animation: plasmaGlow 1.5s ease-in-out infinite, electricBorder 0.8s linear infinite;
+    border: 3px solid #00bfff !important;
+    position: relative;
+    overflow: visible;
+}
+
+/* Plasma streak indicator */
+.streak-indicator.plasma .streak-flames {
+    filter: drop-shadow(0 0 10px rgba(0, 191, 255, 0.9));
+    animation: electricFlash 0.3s ease-in-out infinite;
+}
+
+@keyframes electricFlash {
+    0%, 100% { opacity: 1; transform: translateY(0); }
+    50% { opacity: 0.8; transform: translateY(-1px); }
+}
+
+.streak-indicator.plasma .streak-count {
+    background: linear-gradient(180deg, #00ffff 0%, #00bfff 50%, #1e90ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: plasmaCountGlow 0.8s ease-in-out infinite;
+}
+
+@keyframes plasmaCountGlow {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(0, 191, 255, 0.9)); }
+    50% { filter: drop-shadow(0 0 20px rgba(135, 206, 235, 1)) drop-shadow(0 0 30px rgba(0, 255, 255, 0.8)); }
+}
+
+.streak-indicator.plasma .streak-label {
+    color: #00bfff;
+    text-shadow: 0 0 10px rgba(0, 191, 255, 0.9), 0 0 20px rgba(0, 255, 255, 0.5);
+}
+
+/* Plasma particles */
+.fire-particles.plasma .fire-particle {
+    background: radial-gradient(circle, #00ffff 0%, #00bfff 50%, transparent 70%);
+}
+
+.fire-particles.plasma .fire-particle:nth-child(odd) {
+    background: linear-gradient(to top, #1e90ff, #00bfff, #00ffff);
+    border-radius: 50%;
+    width: 5px;
+    height: 5px;
+}
+
+.fire-particles.plasma .fire-particle:nth-child(3n) {
+    animation-duration: 0.6s;
+    width: 3px;
+    height: 8px;
 }
 
 /* ==================== CONFETTI EFFECT ==================== */
