@@ -280,33 +280,58 @@ async function loadDistractors() {
     const currentPOS = currentWord.partOfSpeech?.toLowerCase() || '';
     const currentLevel = currentWord.level || 1;
 
-    // Get potential distractors - prioritize same part of speech and higher difficulty
-    let potentialDistractors = allWordsCache.filter(w => {
+    // Get distractors from same level (2 words)
+    let sameLevelWords = allWordsCache.filter(w => {
         if (w.id === currentWord.id) return false;
-        return true;
+        return w.level === currentLevel;
     });
 
-    // Sort by: 1) same POS, 2) higher/same level, 3) random
-    potentialDistractors.sort((a, b) => {
+    // Prioritize same part of speech, then shuffle
+    sameLevelWords.sort((a, b) => {
         const aPOS = a.partOfSpeech?.toLowerCase() || '';
         const bPOS = b.partOfSpeech?.toLowerCase() || '';
-
-        // Prioritize same part of speech
         const aSamePOS = aPOS === currentPOS ? 1 : 0;
         const bSamePOS = bPOS === currentPOS ? 1 : 0;
         if (aSamePOS !== bSamePOS) return bSamePOS - aSamePOS;
-
-        // Then prioritize same or higher level
-        const aHigherLevel = a.level >= currentLevel ? 1 : 0;
-        const bHigherLevel = b.level >= currentLevel ? 1 : 0;
-        if (aHigherLevel !== bHigherLevel) return bHigherLevel - aHigherLevel;
-
-        // Then random
         return Math.random() - 0.5;
     });
 
-    // Take top 3 as distractors
-    const distractors = potentialDistractors.slice(0, 3);
+    // Get 1 distractor from level 4 or 5 (harder words)
+    let hardWords = allWordsCache.filter(w => {
+        if (w.id === currentWord.id) return false;
+        return w.level === 4 || w.level === 5;
+    });
+
+    // Prioritize same part of speech for hard word too
+    hardWords.sort((a, b) => {
+        const aPOS = a.partOfSpeech?.toLowerCase() || '';
+        const bPOS = b.partOfSpeech?.toLowerCase() || '';
+        const aSamePOS = aPOS === currentPOS ? 1 : 0;
+        const bSamePOS = bPOS === currentPOS ? 1 : 0;
+        if (aSamePOS !== bSamePOS) return bSamePOS - aSamePOS;
+        return Math.random() - 0.5;
+    });
+
+    // Build distractors: 2 from same level + 1 from level 4/5
+    const distractors = [];
+
+    // Add 2 from same level
+    distractors.push(...sameLevelWords.slice(0, 2));
+
+    // Add 1 from level 4/5 (or fallback to same level if not enough hard words)
+    if (hardWords.length > 0) {
+        distractors.push(hardWords[0]);
+    } else if (sameLevelWords.length > 2) {
+        distractors.push(sameLevelWords[2]);
+    }
+
+    // If we still don't have 3 distractors, fill from any level
+    if (distractors.length < 3) {
+        const remaining = allWordsCache.filter(w =>
+            w.id !== currentWord.id && !distractors.find(d => d.id === w.id)
+        ).sort(() => Math.random() - 0.5);
+        distractors.push(...remaining.slice(0, 3 - distractors.length));
+    }
 
     // Create options array and shuffle
     currentOptions = [currentWord, ...distractors].sort(() => Math.random() - 0.5);
