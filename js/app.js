@@ -3,6 +3,7 @@ let currentWord = null;
 let currentOptions = [];
 let sessionCount = 0;
 let sessionCorrect = 0;
+let currentStreak = 0; // Track consecutive correct answers
 let wordsPool = [];
 let userProgress = {};
 let difficultWords = [];
@@ -311,14 +312,95 @@ async function loadDistractors() {
     currentOptions = [currentWord, ...distractors].sort(() => Math.random() - 0.5);
 }
 
+// Update streak fire effect on quiz card
+function updateStreakEffect() {
+    const quizCard = document.getElementById('quiz-card');
+    if (currentStreak >= 3) {
+        quizCard.classList.add('on-fire');
+    } else {
+        quizCard.classList.remove('on-fire');
+    }
+}
+
+// Create confetti effect
+function createConfetti() {
+    const container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+
+    const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#8b5cf6'];
+
+    for (let i = 0; i < 100; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDelay = Math.random() * 2 + 's';
+        confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        container.appendChild(confetti);
+    }
+
+    // Remove after animation
+    setTimeout(() => container.remove(), 5000);
+}
+
+// Get encouraging message based on performance
+function getEncouragement(accuracy, isPerfect) {
+    if (isPerfect) {
+        const perfectMessages = [
+            "Perfect score! You're absolutely incredible! 🌟",
+            "Flawless! Your dedication is truly inspiring! ✨",
+            "100%! You're on fire! Keep that momentum going! 🔥",
+            "Amazing! Every single one correct - you're a star! ⭐",
+            "Perfect! Your hard work is really paying off! 💪"
+        ];
+        return perfectMessages[Math.floor(Math.random() * perfectMessages.length)];
+    } else if (accuracy >= 80) {
+        const greatMessages = [
+            "Great job! You're doing wonderfully! 🎉",
+            "So close to perfect! You've got this! 💫",
+            "Impressive work! Keep pushing forward! 🚀",
+            "You're making amazing progress! 🌈"
+        ];
+        return greatMessages[Math.floor(Math.random() * greatMessages.length)];
+    } else if (accuracy >= 60) {
+        const goodMessages = [
+            "Nice effort! Every step counts! 💪",
+            "You're learning and growing! Keep going! 🌱",
+            "Good work! Practice makes perfect! 📚",
+            "You've got potential! Let's keep building! 🏗️"
+        ];
+        return goodMessages[Math.floor(Math.random() * goodMessages.length)];
+    } else {
+        const encourageMessages = [
+            "Don't give up! Every expert was once a beginner! 💖",
+            "You're braver than you believe! Keep trying! 🦋",
+            "Learning takes time - you're doing great! 🌻",
+            "Mistakes help us grow! You've got this! 🌟"
+        ];
+        return encourageMessages[Math.floor(Math.random() * encourageMessages.length)];
+    }
+}
+
 function showModuleComplete() {
     const accuracy = moduleProgress > 0 ? Math.round((moduleCorrect / moduleProgress) * 100) : 0;
     const hasWrongAnswers = wrongAnswers.length > 0;
+    const isPerfect = moduleCorrect === moduleProgress;
+
+    // Clear fire effect
+    currentStreak = 0;
+    updateStreakEffect();
+
+    // Show confetti!
+    createConfetti();
+
+    const encouragement = getEncouragement(accuracy, isPerfect);
 
     document.getElementById('quiz-card').innerHTML = `
-        <div class="no-reviews">
-            <i class="fas fa-trophy" style="color: #f59e0b;"></i>
+        <div class="no-reviews module-complete">
+            <div class="trophy-icon">${isPerfect ? '👑' : '🏆'}</div>
             <h3>Module ${currentModule} Complete!</h3>
+            <p class="encouragement">${encouragement}</p>
             <p style="font-size: 1.25rem; margin: 16px 0;">Score: ${moduleCorrect}/${moduleProgress} (${accuracy}%)</p>
             ${hasWrongAnswers ? `<p style="color: #ef4444;">You'll review ${wrongAnswers.length} missed word(s) in the next module.</p>` : '<p style="color: #10b981;">Perfect! No words to review.</p>'}
             ${currentModule < TOTAL_MODULES ? `
@@ -326,7 +408,7 @@ function showModuleComplete() {
                     <i class="fas fa-arrow-right"></i> Start Module ${currentModule + 1}
                 </button>
             ` : `
-                <p style="margin-top: 16px; font-weight: bold;">All 5 modules completed!</p>
+                <p style="margin-top: 16px; font-weight: bold;">🎊 All 5 modules completed! 🎊</p>
                 <button class="btn primary" id="restart-modules-btn" style="margin-top: 16px;">
                     <i class="fas fa-redo"></i> Start Over
                 </button>
@@ -460,8 +542,15 @@ async function handleQuizAnswer(selectedBtn) {
         selectedBtn.classList.add('correct');
         sessionCorrect++;
         moduleCorrect++;
+        currentStreak++;
+
+        // Apply fire effect for 3+ streak
+        updateStreakEffect();
     } else {
         selectedBtn.classList.add('incorrect');
+        currentStreak = 0; // Reset streak
+        updateStreakEffect();
+
         // Add to wrong answers for repetition in next module
         if (!wrongAnswers.find(w => w.id === currentWord.id)) {
             wrongAnswers.push(currentWord);
