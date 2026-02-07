@@ -312,7 +312,7 @@ async function saveWord() {
         }
 
         document.getElementById('word-modal').classList.add('hidden');
-        loadWords();
+        loadAllWords();
     } catch (error) {
         alert('Error saving word: ' + error.message);
     }
