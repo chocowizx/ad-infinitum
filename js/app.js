@@ -315,10 +315,47 @@ async function loadDistractors() {
 // Update streak fire effect on quiz card
 function updateStreakEffect() {
     const quizCard = document.getElementById('quiz-card');
+
+    // Remove existing streak indicator
+    const existingIndicator = document.querySelector('.streak-indicator');
+    if (existingIndicator) existingIndicator.remove();
+
+    // Remove existing fire particles
+    const existingParticles = document.querySelector('.fire-particles');
+    if (existingParticles) existingParticles.remove();
+
     if (currentStreak >= 3) {
         quizCard.classList.add('on-fire');
+
+        // Intensity increases with streak
+        const intensity = Math.min(currentStreak - 2, 5); // 1-5 intensity
+        quizCard.dataset.fireIntensity = intensity;
+
+        // Add streak indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'streak-indicator';
+        indicator.innerHTML = `
+            <span class="streak-flames">${'🔥'.repeat(Math.min(intensity, 5))}</span>
+            <span class="streak-count">${currentStreak}</span>
+            <span class="streak-label">STREAK!</span>
+        `;
+        quizCard.appendChild(indicator);
+
+        // Add floating fire particles
+        const particles = document.createElement('div');
+        particles.className = 'fire-particles';
+        for (let i = 0; i < 12 + intensity * 3; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'fire-particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 2 + 's';
+            particle.style.animationDuration = (1 + Math.random() * 1.5) + 's';
+            particles.appendChild(particle);
+        }
+        quizCard.appendChild(particles);
     } else {
         quizCard.classList.remove('on-fire');
+        delete quizCard.dataset.fireIntensity;
     }
 }
 
