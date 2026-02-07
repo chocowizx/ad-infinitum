@@ -156,8 +156,11 @@
             let imported = 0;
             let errors = 0;
 
-            // Import in batches of 50
-            const batchSize = 50;
+            // Helper function to delay
+            const delay = ms => new Promise(r => setTimeout(r, ms));
+
+            // Import in smaller batches of 20 with delays
+            const batchSize = 20;
             for (let i = 0; i < words.length; i += batchSize) {
                 const batch = db.batch();
                 const chunk = words.slice(i, i + batchSize);
@@ -177,14 +180,28 @@
                     });
                 }
 
-                try {
-                    await batch.commit();
-                    imported += chunk.length;
-                    status.innerHTML = '<p>Imported ' + imported + ' / ' + words.length + ' words...</p>';
-                } catch (e) {
-                    errors += chunk.length;
-                    console.error('Batch error:', e);
+                // Retry up to 3 times
+                let success = false;
+                for (let attempt = 0; attempt < 3 && !success; attempt++) {
+                    try {
+                        await batch.commit();
+                        imported += chunk.length;
+                        success = true;
+                    } catch (e) {
+                        console.error('Batch error (attempt ' + (attempt+1) + '):', e);
+                        if (attempt < 2) {
+                            status.innerHTML = '<p style="color:#f59e0b;">Retrying batch at ' + imported + '... (attempt ' + (attempt+2) + ')</p>';
+                            await delay(2000); // Wait 2 seconds before retry
+                        } else {
+                            errors += chunk.length;
+                        }
+                    }
                 }
+
+                status.innerHTML = '<p>Imported ' + imported + ' / ' + words.length + ' words... (' + Math.round(100*imported/words.length) + '%)</p>';
+
+                // Small delay between batches to avoid rate limiting
+                await delay(100);
             }
 
             status.innerHTML = '<p class="success">Done! Imported ' + imported + ' words. ' + (errors > 0 ? errors + ' errors.' : '') + '</p><p>Go back to <a href="index.html" style="color:#6366f1">index.html</a> to see them.</p>';
