@@ -224,12 +224,18 @@ async function loadQuizQuestion() {
     // Restore quiz card structure if it was replaced with a message
     restoreQuizCard();
 
+    // Check if current module is complete (reached 20 questions)
+    if (moduleProgress >= QUESTIONS_PER_MODULE) {
+        showModuleComplete();
+        return;
+    }
+
     // Initialize module if queue is empty
     if (moduleQueue.length === 0) {
         initializeModule();
     }
 
-    // Get next question from queue
+    // Get next question from queue (shouldn't happen, but safety check)
     if (moduleQueue.length === 0) {
         showModuleComplete();
         return;
@@ -361,8 +367,9 @@ function displayQuizQuestion() {
     }
 
     // Replace the word with a blank and detect the suffix used
+    // Only detect SIMPLE suffixes that can be applied to other words
     const baseWord = currentWord.word.replace(/e$/, ''); // handle words ending in 'e'
-    const wordRegex = new RegExp(`\\b(${currentWord.word}|${baseWord})(s|ed|ing|ly|er|est|ment|ness|tion|ation|'s)?\\b`, 'gi');
+    const wordRegex = new RegExp(`\\b(${currentWord.word}|${baseWord})(s|ed|ing|ly|er|est|'s)?\\b`, 'gi');
 
     // Find the first match to detect the suffix
     let detectedSuffix = '';
@@ -372,11 +379,18 @@ function displayQuizQuestion() {
         const base = currentWord.word.toLowerCase();
         const baseNoE = baseWord.toLowerCase();
         if (matchedWord !== base && matchedWord !== baseNoE) {
-            // Extract suffix
+            // Extract suffix - only simple ones
+            const simpleSuffixes = ['s', 'ed', 'ing', 'ly', 'er', 'est'];
             if (matchedWord.startsWith(base)) {
-                detectedSuffix = matchedWord.slice(base.length);
+                const suffix = matchedWord.slice(base.length);
+                if (simpleSuffixes.includes(suffix)) {
+                    detectedSuffix = suffix;
+                }
             } else if (matchedWord.startsWith(baseNoE)) {
-                detectedSuffix = matchedWord.slice(baseNoE.length);
+                const suffix = matchedWord.slice(baseNoE.length);
+                if (simpleSuffixes.includes(suffix)) {
+                    detectedSuffix = suffix;
+                }
             }
         }
     }
