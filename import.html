@@ -159,8 +159,8 @@
             // Helper function to delay
             const delay = ms => new Promise(r => setTimeout(r, ms));
 
-            // Import in smaller batches of 20 with delays
-            const batchSize = 20;
+            // Import in small batches of 10 with delays
+            const batchSize = 10;
             for (let i = 0; i < words.length; i += batchSize) {
                 const batch = db.batch();
                 const chunk = words.slice(i, i + batchSize);
@@ -200,8 +200,8 @@
 
                 status.innerHTML = '<p>Imported ' + imported + ' / ' + words.length + ' words... (' + Math.round(100*imported/words.length) + '%)</p>';
 
-                // Small delay between batches to avoid rate limiting
-                await delay(100);
+                // Longer delay between batches to avoid rate limiting
+                await delay(500);
             }
 
             status.innerHTML = '<p class="success">Done! Imported ' + imported + ' words. ' + (errors > 0 ? errors + ' errors.' : '') + '</p><p>Go back to <a href="index.html" style="color:#6366f1">index.html</a> to see them.</p>';
